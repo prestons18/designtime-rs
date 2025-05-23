@@ -1,37 +1,57 @@
-mod lexer;
-mod parser;
-mod ast;
-mod vm;
-mod bytecode;
-mod emitter_js;
-mod emitter_py;
-
-use lexer::tokenize;
-use parser::parse;
-use vm::{Runtime, StdOut};
-use bytecode::compile_ast;
-use emitter_js::emit_js;
-use emitter_py::emit_python;
+use designtime_rs::{
+    lexer::Lexer,
+    parser::Parser,
+};
 
 fn main() {
-    let input = r#"print("hello world")"#;
+    let input = r#"
+    import { Checkbox } from "@designtime.core.ui.MUI"
+    
+    page Home {
+        layout: Glassmorphism
+        render: { 
+            <div class="container">
+                <h1>Welcome to DesignTime</h1>
+                <Checkbox checked={true}>Do you see this? {1+1}</Checkbox>
+            </div>
+        }
+        functions: {
+            onSelect: () => {
+                let x = 40;
+                let y = 2;
+                let result = x + y;
+                return result;
+            }
+        }
+    }
+    "#;
 
-    // Step 1: Tokenize & Parse
-    let tokens = tokenize(input);
-    let ast = parse(&tokens);
+    println!("=== Input ===\n{}", input);
 
-    // Step 2: Compile to Bytecode
-    let bytecode = compile_ast(&ast);
+    // Step 1: Tokenize
+    let tokens = Lexer::new(input).tokenize();
+    println!("\n=== Tokens ===");
+    println!("{:#?}", tokens);
+    
+    // Step 2: Parse tokens into AST
+    let ast = Parser::new(tokens).parse();
+    println!("\n=== AST ===");
+    println!("{:#?}", ast);
 
-    // Step 3: Run in VM
-    let mut stdout = StdOut;
-    let mut runtime = Runtime::new(&mut stdout);
-    runtime.run_bytecode(&bytecode);
+    // // Step 3: Compile to IR
+    // let module = Compiler::compile(&ast);
 
-    // Step 4: Emit to JS and Python
-    let js_output = emit_js(&bytecode);
-    println!("Generated JavaScript:\n{}", js_output);
+    // println!("\n=== IR ===");
+    // println!("{:#?}", module);
 
-    let py_output = emit_python(&bytecode);
-    println!("Generated Python:\n{}", py_output);
+    // // Step 4: Generate JavaScript output using the React emitter
+    // let mut emitter = create_emitter(TargetPlatform::React);
+    // let js_code = emitter.emit_module(&module);
+    
+    // println!("\n=== JavaScript ===");
+    // println!("{}", js_code);
+    
+    // // Step 5: Write to output file
+    // std::fs::write("output.js", &js_code).expect("Failed to write output file");
+    // println!("\nOutput written to output.js");
 }

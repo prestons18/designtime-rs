@@ -1,6 +1,22 @@
 [package]
-name = "designtime"
+name = "designtime-rs"
 version = "0.1.0"
 edition = "2024"
+description = "A template engine with JSX support"
+authors = ["Preston Arnold <me@prestonarnold.com>"]
+license = "Open Arnold Development License"
+repository = "https://github.com/prestonarnold/designtime-rs"
+readme = "README.md"
+
+[lib]
+name = "designtime_rs"
+path = "src/lib.rs"
+
+[[bin]]
+name = "designtime_rs"
+path = "src/main.rs"
 
 [dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_derive = "1.0"
