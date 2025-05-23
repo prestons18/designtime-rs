@@ -2,8 +2,8 @@
 
 Copyright 2025 Preston Arnold - Arnold Development
 
-Licensed under the Apache License, Version 2.0 (the "License");  
-you may not use this file except in compliance with the License.  
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
 [http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0)
@@ -12,19 +12,19 @@ You may obtain a copy of the License at
 
 ## Commons Clause Restriction
 
-The software is provided under the Apache License 2.0, except that the rights granted under the License  
+The software is provided under the Apache License 2.0, except that the rights granted under the License
 are subject to the following restriction:
 
 You **may not Sell** the software, or any derivative works thereof.
 
-For purposes of this restriction, **"Sell"** means practicing any or all of the rights granted to you under  
-the License to provide to third parties, for a fee or other consideration, a product or service whose  
+For purposes of this restriction, **"Sell"** means practicing any or all of the rights granted to you under
+the License to provide to third parties, for a fee or other consideration, a product or service whose
 value derives, entirely or substantially, from the functionality of the software.
 
 The following are **not considered** "Sell" for purposes of this License:
 
-- Offering the software for free,  
-- Providing services, support, or consulting,  
+- Offering the software for free,
+- Providing services, support, or consulting,
 - Using the software internally in your organization.
 
 ---
@@ -37,10 +37,10 @@ All other terms and conditions of the Apache License, Version 2.0 apply, except 
 
 ## Disclaimer
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT  
-LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,  
-WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE  
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ---
