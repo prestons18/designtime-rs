@@ -1,6 +1,7 @@
 use designtime_rs::{
     lexer::Lexer,
     parser::Parser,
+    ir::Program
 };
 
 fn main() {
@@ -38,11 +39,11 @@ fn main() {
     println!("\n=== AST ===");
     println!("{:#?}", ast);
 
-    // // Step 3: Compile to IR
-    // let module = Compiler::compile(&ast);
+    // Step 3: Compile to IR
+    let module = Program::from_ast(ast);
 
-    // println!("\n=== IR ===");
-    // println!("{:#?}", module);
+    println!("\n=== IR ===");
+    println!("{:#?}", module);
 
     // // Step 4: Generate JavaScript output using the React emitter
     // let mut emitter = create_emitter(TargetPlatform::React);
