@@ -1,4 +1,4 @@
-use designtime_rs::{ir::Program, lexer::Lexer, parser::Parser};
+use designtime_rs::{ir::Program, lexer::Lexer, parser::Parser, validate_and_load_workspace};
 
 fn main() {
     let input = r#"
@@ -24,6 +24,9 @@ fn main() {
     "#;
 
     println!("=== Input ===\n{}", input);
+
+    let config = validate_and_load_workspace();
+    println!("Project loaded: {:?}", config.project.name);
 
     // Step 1: Tokenize
     let tokens = Lexer::new(input).tokenize();

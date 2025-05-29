@@ -1,7 +1,6 @@
 use crate::ast::{ASTNode, Function, ImportDecl, Node, PageDecl};
 use crate::lexer::Token;
 use designtime_jsx::{RenderNode, parse_render_block};
-
 pub struct Parser {
     tokens: Vec<Token>,
     pos: usize,
