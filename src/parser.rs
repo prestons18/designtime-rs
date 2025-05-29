@@ -1,5 +1,6 @@
+use crate::ast::{ASTNode, Function, ImportDecl, Node, PageDecl};
 use crate::lexer::Token;
-use crate::ast::{ASTNode, ImportDecl, PageDecl, Node, Function, Attribute};
+use designtime_jsx::{RenderNode, parse_render_block};
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -72,21 +73,17 @@ impl Parser {
         } else {
             panic!("Expected page name");
         };
-        if self.bump() != Token::LBrace {
-            panic!("Expected '{{' after page name");
-        }
-    
+        self.expect(Token::LBrace, "Expected '{' after page name");
+
         let mut layout = None;
-        let mut render = Vec::new();
+        let mut render_nodes = Vec::new(); // Changed to Vec
         let mut functions = Vec::new();
-    
+
         while self.peek() != Token::RBrace {
             match self.peek() {
                 Token::Layout => {
-                    self.bump(); // Consume 'layout'
-                    if self.bump() != Token::Colon {
-                        panic!("Expected ':' after 'layout'");
-                    }
+                    self.bump();
+                    self.expect(Token::Colon, "Expected ':' after 'layout'");
                     if let Token::Ident(l) = self.bump() {
                         layout = Some(l.clone());
                     } else {
@@ -94,269 +91,143 @@ impl Parser {
                     }
                 }
                 Token::Render => {
-                    self.bump(); // Consume 'render'
-                    if self.bump() != Token::Colon {
-                        panic!("Expected ':' after 'render'");
+                    self.bump();
+                    self.expect(Token::Colon, "Expected ':' after 'render'");
+                    self.expect(Token::LBrace, "Expected '{' to start render block");
+
+                    // Extract the raw tokens inside render block as a string
+                    let jsx_source = self.collect_until_closing_brace();
+
+                    // Parse JSX using designtime-jsx crate
+                    let root_node = designtime_jsx::parse_render_block(&jsx_source)
+                        .expect("Failed to parse JSX block");
+
+                    // Extract children from root element
+                    if let RenderNode::Element { children, .. } = root_node {
+                        render_nodes = children.into_iter().map(Node::from).collect();
+                    } else {
+                        panic!("JSX root should be an element");
                     }
-                    if self.bump() != Token::LBrace {
-                        panic!("Expected '{{' to start render block");
-                    }
-                    render = self.parse_nodes_until_closing_brace();
                 }
                 Token::Functions => {
-                    self.bump(); // Consume 'functions'
-                    if self.bump() != Token::Colon {
-                        panic!("Expected ':' after 'functions'");
-                    }
+                    self.bump();
+                    self.expect(Token::Colon, "Expected ':' after 'functions'");
                     functions = self.parse_functions();
                 }
-                tok => panic!("Unexpected Token in page body: {:?}", tok),
+                other => panic!("Unexpected token in page body: {:?}", other),
             }
         }
-        self.bump(); // Consume closing '}'
-    
+
+        self.expect(Token::RBrace, "Expected '}' to close page");
+
         PageDecl {
             name,
             layout,
-            render,
+            render: render_nodes,
             functions,
         }
     }
-    
-    // This parses multiple nodes until it sees the matching closing '}' for render block
-    fn parse_nodes_until_closing_brace(&mut self) -> Vec<Node> {
-        let mut nodes = Vec::new();
-    
-        while self.peek() != Token::RBrace && self.peek() != Token::EOF {
-            nodes.push(self.parse_single_node());
-        }
-    
-        if self.bump() != Token::RBrace {
-            panic!("Expected '}}' to close render block");
-        }
-        nodes
-    }
-    
-    fn parse_single_node(&mut self) -> Node {
-        match self.peek() {
-            Token::LT => {
-                self.bump(); // consume '<'
-    
-                if self.peek() == Token::Slash {
-                    // closing tag found without matching opening tag, error
-                    panic!("Unexpected closing tag");
+
+    fn collect_until_closing_brace(&mut self) -> String {
+        let mut depth = 1;
+        let mut jsx_tokens = Vec::new();
+        let mut expression_depth = 0; // Track JSX expression depth
+
+        // Skip the opening brace
+        self.bump();
+
+        while depth > 0 {
+            let token = self.bump();
+            match &token {
+                Token::LBrace => {
+                    expression_depth += 1;
+                    jsx_tokens.push(token);
                 }
-    
-                let name = if let Token::Ident(n) = self.bump() {
-                    n.clone()
-                } else {
-                    panic!("Expected tag name after '<'");
-                };
-    
-                let attrs = self.parse_attributes();
-    
-                if self.peek() == Token::Slash {
-                    // self-closing tag like <Checkbox checked={true} />
-                    self.bump(); // consume '/'
-                    self.expect(Token::GT, "Expected '>' after '/' in self-closing tag");
-                    Node::Element {
-                        name,
-                        attrs,
-                        children: vec![],
-                    }
-                } else {
-                    // Normal tag with children: consume '>'
-                    self.expect(Token::GT, "Expected '>' after tag name");
-    
-                    let mut children = Vec::new();
-    
-                    // parse children nodes until matching closing tag
-                    loop {
-                        match self.peek() {
-                            Token::LT => {
-                                // Check if next tokens are closing tag
-                                if self.pos + 1 < self.tokens.len() {
-                                    if let Token::Slash = self.tokens[self.pos + 1] {
-                                        // consume closing tag
-                                        self.bump(); // consume '<'
-                                        self.bump(); // consume '/'
-                                        let close_name = if let Token::Ident(n) = self.bump() {
-                                            n.clone()
-                                        } else {
-                                            panic!("Expected closing tag name");
-                                        };
-                                        if close_name != name {
-                                            panic!(
-                                                "Mismatched closing tag: expected </{}>, found </{}>",
-                                                name, close_name
-                                            );
-                                        }
-                                        self.expect(Token::GT, "Expected '>' after closing tag");
-                                        break; // closing tag matched, exit loop
-                                    }
-                                }
-                                // Otherwise parse child node recursively
-                                children.push(self.parse_single_node());
-                            }
-    
-                            Token::Text(text) => {
-                                let trimmed = text.trim();
-                                if !trimmed.is_empty() {
-                                    children.push(Node::Text(trimmed.to_string()));
-                                }
-                                self.bump();
-                            }
-    
-                            Token::LBrace => {
-                                // Expression block inside JSX
-                                self.bump(); // consume '{'
-                                let mut expr_tokens = vec![];
-                                while self.peek() != Token::RBrace && self.peek() != Token::EOF {
-                                    expr_tokens.push(format!("{:?}", self.bump()));
-                                }
-                                self.expect(Token::RBrace, "Expected '}' to close expression block");
-                                children.push(Node::Text(expr_tokens.join(" ")));
-                            }
-    
-                            other => {
-                                println!("Skipping unexpected token in children: {:?}", other);
-                                self.bump();
-                            }
-                        }
-                    }
-    
-                    Node::Element {
-                        name,
-                        attrs,
-                        children,
-                    }
-                }
-            }
-    
-            Token::Text(text) => {
-                let trimmed = text.trim();
-                self.bump();
-                if !trimmed.is_empty() {
-                    Node::Text(trimmed.to_string())
-                } else {
-                    // Empty text node, parse next node instead
-                    self.parse_single_node()
-                }
-            }
-    
-            Token::LBrace => {
-                // Expression block alone as a node
-                self.bump(); // consume '{'
-                let mut expr_tokens = vec![];
-                while self.peek() != Token::RBrace && self.peek() != Token::EOF {
-                    expr_tokens.push(format!("{:?}", self.bump()));
-                }
-                self.expect(Token::RBrace, "Expected '}' to close expression block");
-                Node::Text(expr_tokens.join(" "))
-            }
-    
-            other => {
-                panic!("Unexpected token while parsing node: {:?}", other);
-            }
-        }
-    }
-    
-    fn parse_attributes(&mut self) -> Vec<Attribute> {
-        let mut attrs = Vec::new();
-        loop {
-            match self.peek() {
-                Token::GT | Token::Slash => break,
-                Token::Ident(attr_name) => {
-                    let name = attr_name.clone();
-                    self.bump(); // Consume attribute name
-                    let value = if self.peek() == Token::EQ {
-                        self.bump(); // Consume '='
-                        match self.bump() {
-                            Token::StringLiteral(val) => val.clone(),
-                            Token::LBrace => {
-                                // Handle {expression} values
-                                let val = if let Token::Ident(val) = self.bump() {
-                                    val.clone()
-                                } else {
-                                    panic!("Expected expression inside '{{' '}}'");
-                                };
-                                if self.bump() != Token::RBrace {
-                                    panic!("Expected '}}' after expression");
-                                }
-                                val
-                            }
-                            Token::Ident(val) => val.clone(),
-                            _ => panic!("Expected value after '=' in attribute"),
-                        }
-                    } else if self.peek() == Token::Colon {
-                        self.bump(); // Consume ':'
-                        match self.bump() {
-                            Token::StringLiteral(val) => val.clone(),
-                            Token::Ident(val) => val.clone(),
-                            _ => panic!("Expected value after ':' in attribute"),
-                        }
-                    } else if self.peek() == Token::LBrace {
-                        self.bump(); // Consume '{'
-                        let val = if let Token::Ident(val) = self.bump() {
-                            val.clone()
-                        } else {
-                            panic!("Expected expression inside '{{' '}}'");
-                        };
-                        if self.bump() != Token::RBrace {
-                            panic!("Expected '}}' after expression");
-                        }
-                        val
+                Token::RBrace => {
+                    if expression_depth > 0 {
+                        expression_depth -= 1;
+                        jsx_tokens.push(token);
                     } else {
-                        "true".to_string()
-                    };
-                    attrs.push(Attribute::new(name, value));
+                        depth -= 1;
+                        if depth > 0 {
+                            jsx_tokens.push(token);
+                        }
+                    }
                 }
-                _ => {
-                    self.bump(); // Skip unexpected Tokens
-                }
+                Token::EOF => panic!("Unexpected EOF while parsing render JSX block"),
+                _ => jsx_tokens.push(token),
             }
         }
-        attrs
+
+        // Convert tokens to raw source string with proper JSX formatting
+        Self::tokens_to_jsx_string(&jsx_tokens)
     }
-    
+
+    // Improved JSX token reconstruction
+    fn tokens_to_jsx_string(tokens: &[Token]) -> String {
+        let mut result = String::new();
+        let mut prev_token = None;
+
+        for token in tokens {
+            // Add space when needed
+            if let Some(prev) = prev_token {
+                match (prev, token) {
+                    // No space between these tokens
+                    (Token::LT, _)
+                    | (Token::Slash, _)
+                    | (Token::EQ, _)
+                    | (_, Token::GT)
+                    | (_, Token::SlashGT) => {}
+
+                    // Add space after text
+                    (Token::Text(_), Token::LT) => result.push(' '),
+
+                    // Add space between attributes
+                    (Token::StringLiteral(_), Token::Ident(_))
+                    | (Token::Ident(_), Token::Ident(_)) => result.push(' '),
+
+                    // Default: add space
+                    _ => result.push(' '),
+                }
+            }
+
+            result.push_str(&token.to_string());
+            prev_token = Some(token.clone()); // Clone the token here
+        }
+
+        result
+    }
+
     fn expect(&mut self, expected: Token, msg: &str) {
         let token = self.bump();
         if token != expected {
             panic!("{}: found {:?}", msg, token);
         }
     }
-    
 
     fn skip_whitespace(&mut self) {
-        while let Token::Text(text) = self.peek() {
-            if text.trim().is_empty() {
-                self.bump();
-            } else {
-                break;
-            }
+        while matches!(self.peek(), Token::Text(text) if text.trim().is_empty()) {
+            self.bump();
         }
     }
 
-
     fn parse_functions(&mut self) -> Vec<Function> {
-        if self.bump() != Token::LBrace {
-            panic!("Expected '{{' to start functions");
-        }
-
+        self.expect(Token::LBrace, "Expected '{' to start functions");
         let mut funcs = Vec::new();
-        self.skip_whitespace();
 
         while self.peek() != Token::RBrace {
+            self.skip_whitespace();
+
             let name = if let Token::Ident(n) = self.bump() {
                 n.clone()
             } else {
                 panic!("Expected function name");
             };
-            if self.bump() != Token::Colon {
-                panic!("Expected ':' after function name");
-            }
+
+            self.expect(Token::Colon, "Expected ':' after function name");
             self.skip_whitespace();
 
+            // Parse parameters
             let mut params = Vec::new();
             if self.peek() == Token::LParen {
                 self.bump(); // Consume '('
@@ -374,59 +245,63 @@ impl Parser {
             }
 
             self.skip_whitespace();
-
-            if self.bump() != Token::Arrow {
-                panic!("Expected '=>' after parameters");
-            }
-
+            self.expect(Token::Arrow, "Expected '=>' after parameters");
             self.skip_whitespace();
 
+            // Parse function body
             let body = if self.peek() == Token::LBrace {
                 self.bump(); // Consume '{'
                 let mut body_tokens = Vec::new();
                 let mut brace_count = 1;
+
                 while brace_count > 0 {
                     match self.bump() {
                         Token::LBrace => {
                             brace_count += 1;
-                            body_tokens.push("{".to_string());
+                            body_tokens.push(Token::LBrace);
                         }
                         Token::RBrace => {
                             brace_count -= 1;
                             if brace_count > 0 {
-                                body_tokens.push("}".to_string());
+                                body_tokens.push(Token::RBrace);
                             }
                         }
-                        Token::SemiColon => {
-                            body_tokens.push(";".to_string());
-                        }
-                        token => {
-                            body_tokens.push(token.to_string());
-                        }
+                        token => body_tokens.push(token),
                     }
                 }
-                vec![body_tokens.join(" ").trim().to_string()]
+
+                // Convert tokens to JavaScript code
+                vec![Self::tokens_to_js_string(&body_tokens)]
             } else {
-                let mut expr = String::new();
-                while self.peek() != Token::Comma && self.peek() != Token::RBrace {
-                    expr.push_str(&self.bump().to_string());
-                    expr.push(' ');
+                // Single expression
+                let mut expr_tokens = Vec::new();
+                while !matches!(self.peek(), Token::Comma | Token::RBrace) {
+                    expr_tokens.push(self.bump());
                 }
-                vec![format!("return {}", expr.trim())]
+                vec![format!(
+                    "return {}",
+                    Self::tokens_to_js_string(&expr_tokens)
+                )]
             };
 
-            funcs.push(Function {
-                name,
-                params,
-                body,
-            });
+            funcs.push(Function { name, params, body });
 
             if self.peek() == Token::Comma {
                 self.bump(); // Consume ','
             }
             self.skip_whitespace();
         }
-        self.bump(); // Consume '}'
+
+        self.expect(Token::RBrace, "Expected '}' to close functions block");
         funcs
+    }
+
+    // Convert tokens to JavaScript code
+    fn tokens_to_js_string(tokens: &[Token]) -> String {
+        tokens
+            .iter()
+            .map(|t| t.to_string())
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 }

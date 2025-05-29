@@ -1,8 +1,4 @@
-use designtime_rs::{
-    lexer::Lexer,
-    parser::Parser,
-    ir::Program
-};
+use designtime_rs::{ir::Program, lexer::Lexer, parser::Parser};
 
 fn main() {
     let input = r#"
@@ -33,7 +29,7 @@ fn main() {
     let tokens = Lexer::new(input).tokenize();
     println!("\n=== Tokens ===");
     println!("{:#?}", tokens);
-    
+
     // Step 2: Parse tokens into AST
     let ast = Parser::new(tokens).parse();
     println!("\n=== AST ===");
@@ -48,10 +44,10 @@ fn main() {
     // // Step 4: Generate JavaScript output using the React emitter
     // let mut emitter = create_emitter(TargetPlatform::React);
     // let js_code = emitter.emit_module(&module);
-    
+
     // println!("\n=== JavaScript ===");
     // println!("{}", js_code);
-    
+
     // // Step 5: Write to output file
     // std::fs::write("output.js", &js_code).expect("Failed to write output file");
     // println!("\nOutput written to output.js");

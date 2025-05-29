@@ -1,9 +1,9 @@
 // most of this file is defining types, this is just a working example
 // i'll use this to make a real IR
 
-use serde::{Serialize, Deserialize};
+use crate::ast::{ASTNode, Attribute, Function, ImportDecl, Node, PageDecl};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::ast::{ASTNode, PageDecl, ImportDecl, Node, Function, Attribute};
 
 /// Represents the entire program in IR form
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -37,9 +37,9 @@ pub struct ImportItem {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ImportType {
-    Named,      // import { Component } from "module"
-    Default,    // import Component from "module"
-    Namespace,  // import * as Module from "module"
+    Named,     // import { Component } from "module"
+    Default,   // import Component from "module"
+    Namespace, // import * as Module from "module"
 }
 
 /// Normalized page definition
@@ -86,6 +86,7 @@ pub struct ComponentNode {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ComponentType {
     Html(String),           // div, span, etc.
+    Expr(String),           // JSX expression
     Custom(String),         // Checkbox, Button, etc.
     Text(String),           // Text content
     Expression(Expression), // {variable} or {expression}
@@ -130,28 +131,28 @@ pub struct Expression {
 /// Types of expressions
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ExpressionType {
-    Variable,           // {variable}
-    FunctionCall,       // {myFunction()}
-    BinaryOperation,    // {x + y}
-    MemberAccess,       // {obj.prop}
-    Conditional,        // {condition ? a : b}
-    Literal,            // {42}, {"string"}, {true}
-    Complex,            // Complex multi-line expressions
+    Variable,        // {variable}
+    FunctionCall,    // {myFunction()}
+    BinaryOperation, // {x + y}
+    MemberAccess,    // {obj.prop}
+    Conditional,     // {condition ? a : b}
+    Literal,         // {42}, {"string"}, {true}
+    Complex,         // Complex multi-line expressions
 }
 
 /// Event handler definition
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EventHandler {
-    pub event: String,          // onClick, onChange, etc.
+    pub event: String, // onClick, onChange, etc.
     pub handler_type: HandlerType,
 }
 
 /// Types of event handlers
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum HandlerType {
-    FunctionRef(String),                    // onClick={handleClick}
-    InlineFunction(FunctionDef),            // onClick={() => {}}
-    Expression(Expression),                 // onClick={e => setValue(e.target.value)}
+    FunctionRef(String),         // onClick={handleClick}
+    InlineFunction(FunctionDef), // onClick={() => {}}
+    Expression(Expression),      // onClick={e => setValue(e.target.value)}
 }
 
 /// Conditional rendering
@@ -202,20 +203,32 @@ pub struct FunctionBody {
 /// Types of functions
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum FunctionType {
-    EventHandler,    // Functions that handle events
-    Utility,         // Helper functions
-    Hook,           // React-like hooks
-    Computed,       // Computed values
-    Effect,         // Side effects
+    EventHandler, // Functions that handle events
+    Utility,      // Helper functions
+    Hook,         // React-like hooks
+    Computed,     // Computed values
+    Effect,       // Side effects
 }
 
 /// Statement in function body
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Statement {
     Expression(Expression),
-    Assignment { target: String, value: Expression },
-    If { condition: Expression, then_body: Vec<Statement>, else_body: Option<Vec<Statement>> },
-    Loop { init: Option<Expression>, condition: Option<Expression>, update: Option<Expression>, body: Vec<Statement> },
+    Assignment {
+        target: String,
+        value: Expression,
+    },
+    If {
+        condition: Expression,
+        then_body: Vec<Statement>,
+        else_body: Option<Vec<Statement>>,
+    },
+    Loop {
+        init: Option<Expression>,
+        condition: Option<Expression>,
+        update: Option<Expression>,
+        body: Vec<Statement>,
+    },
     Return(Option<Expression>),
     Break,
     Continue,
@@ -243,10 +256,10 @@ pub struct HookDef {
 /// Types of hooks
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum HookType {
-    State,      // useState equivalent
-    Effect,     // useEffect equivalent
-    Memo,       // useMemo equivalent
-    Callback,   // useCallback equivalent
+    State,          // useState equivalent
+    Effect,         // useEffect equivalent
+    Memo,           // useMemo equivalent
+    Callback,       // useCallback equivalent
     Custom(String), // Custom hooks
 }
 
@@ -276,7 +289,10 @@ pub enum TypeDef {
     Boolean,
     Array(Box<TypeDef>),
     Object(HashMap<String, TypeDef>),
-    Function { params: Vec<TypeDef>, return_type: Box<TypeDef> },
+    Function {
+        params: Vec<TypeDef>,
+        return_type: Box<TypeDef>,
+    },
     Union(Vec<TypeDef>),
     Custom(String),
     Any,
@@ -307,16 +323,14 @@ impl Program {
         }
 
         // Extract dependencies from imports
-        program.metadata.dependencies = program.imports
+        program.metadata.dependencies = program
+            .imports
             .iter()
             .map(|imp| imp.module.clone())
             .collect();
 
         // Extract exports from pages
-        program.metadata.exports = program.pages
-            .iter()
-            .map(|page| page.name.clone())
-            .collect();
+        program.metadata.exports = program.pages.iter().map(|page| page.name.clone()).collect();
 
         program
     }
@@ -349,7 +363,8 @@ impl Program {
 
 impl ImportDef {
     fn from_ast(import_decl: ImportDecl) -> Self {
-        let imports = import_decl.names
+        let imports = import_decl
+            .names
             .into_iter()
             .map(|name| ImportItem { name, alias: None })
             .collect();
@@ -365,7 +380,8 @@ impl ImportDef {
 impl PageDef {
     fn from_ast(page_decl: PageDecl) -> Self {
         let component_tree = ComponentTree::from_ast_nodes(page_decl.render);
-        let functions = page_decl.functions
+        let functions = page_decl
+            .functions
             .into_iter()
             .map(FunctionDef::from_ast)
             .collect();
@@ -391,7 +407,10 @@ impl PageDef {
         let mut func_names = std::collections::HashSet::new();
         for func in &self.functions {
             if !func_names.insert(&func.name) {
-                return Err(format!("Duplicate function name in page {}: {}", self.name, func.name));
+                return Err(format!(
+                    "Duplicate function name in page {}: {}",
+                    self.name, func.name
+                ));
             }
         }
 
@@ -418,7 +437,8 @@ impl ComponentTree {
                 id: format!("node_{}", id_counter),
                 component_type: ComponentType::Fragment,
                 props: Vec::new(),
-                children: nodes.into_iter()
+                children: nodes
+                    .into_iter()
                     .map(|node| {
                         id_counter += 1;
                         ComponentNode::from_ast_node(&node, &mut id_counter)
@@ -460,16 +480,29 @@ impl ComponentNode {
                 conditional: None,
                 loop_info: None,
             },
-            Node::Element { name, attrs, children } => {
-                let props = attrs.iter()
-                    .map(PropDef::from_ast_attribute)
-                    .collect();
 
-                let child_nodes = children.iter()
+            Node::Expr(expr) => ComponentNode {
+                id,
+                component_type: ComponentType::Expr(expr.clone()),
+                props: Vec::new(),
+                children: Vec::new(),
+                event_handlers: Vec::new(),
+                conditional: None,
+                loop_info: None,
+            },
+
+            Node::Element {
+                name,
+                attrs,
+                children,
+            } => {
+                let props = attrs.iter().map(PropDef::from_ast_attribute).collect();
+
+                let child_nodes = children
+                    .iter()
                     .map(|child| ComponentNode::from_ast_node(child, id_counter))
                     .collect();
 
-                // Determine if it's HTML or custom component
                 let component_type = if is_html_element(name) {
                     ComponentType::Html(name.clone())
                 } else {
@@ -485,9 +518,11 @@ impl ComponentNode {
                     conditional: None,
                     loop_info: None,
                 }
-            },
+            }
+
             Node::Fragment(children) => {
-                let child_nodes = children.iter()
+                let child_nodes = children
+                    .iter()
                     .map(|child| ComponentNode::from_ast_node(child, id_counter))
                     .collect();
 
@@ -535,7 +570,7 @@ impl PropDef {
             PropValue::Number(num)
         } else if attr.value.starts_with('{') && attr.value.ends_with('}') {
             // Expression
-            let expr_content = attr.value[1..attr.value.len()-1].to_string();
+            let expr_content = attr.value[1..attr.value.len() - 1].to_string();
             PropValue::Expression(Expression {
                 expr_type: ExpressionType::Variable, // Simplified
                 raw: expr_content,
@@ -555,7 +590,9 @@ impl PropDef {
 
 impl FunctionDef {
     fn from_ast(func: Function) -> Self {
-        let parameters = func.params.into_iter()
+        let parameters = func
+            .params
+            .into_iter()
             .map(|param| Parameter {
                 name: param,
                 param_type: None,
@@ -564,7 +601,9 @@ impl FunctionDef {
             })
             .collect();
 
-        let statements = func.body.into_iter()
+        let statements = func
+            .body
+            .into_iter()
             .map(|body_line| {
                 // Simple parsing of function body
                 if body_line.trim().starts_with("return") {
@@ -607,11 +646,44 @@ impl FunctionDef {
 // It will also handle custom DesignTime components.
 // Also will be useful for the LSP.
 fn is_html_element(name: &str) -> bool {
-    matches!(name.to_lowercase().as_str(),
-        "div" | "span" | "p" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" |
-        "a" | "img" | "button" | "input" | "form" | "label" | "select" |
-        "option" | "textarea" | "ul" | "ol" | "li" | "table" | "tr" | "td" |
-        "th" | "thead" | "tbody" | "tfoot" | "section" | "article" | "header" |
-        "footer" | "nav" | "main" | "aside" | "figure" | "figcaption"
+    matches!(
+        name.to_lowercase().as_str(),
+        "div"
+            | "span"
+            | "p"
+            | "h1"
+            | "h2"
+            | "h3"
+            | "h4"
+            | "h5"
+            | "h6"
+            | "a"
+            | "img"
+            | "button"
+            | "input"
+            | "form"
+            | "label"
+            | "select"
+            | "option"
+            | "textarea"
+            | "ul"
+            | "ol"
+            | "li"
+            | "table"
+            | "tr"
+            | "td"
+            | "th"
+            | "thead"
+            | "tbody"
+            | "tfoot"
+            | "section"
+            | "article"
+            | "header"
+            | "footer"
+            | "nav"
+            | "main"
+            | "aside"
+            | "figure"
+            | "figcaption"
     )
 }

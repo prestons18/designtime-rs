@@ -3,9 +3,19 @@
 version = 4
 
 [[package]]
+name = "designtime-jsx"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3dae93e5dd0dd35ce7c781a55f5eb426f48218343265c458a745e2014fbe1b6e"
+dependencies = [
+ "tl",
+]
+
+[[package]]
 name = "designtime-rs"
 version = "0.1.0"
 dependencies = [
+ "designtime-jsx",
  "serde",
  "serde_derive",
  "serde_json",
@@ -89,6 +99,12 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
+
+[[package]]
+name = "tl"
+version = "0.7.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b130bd8a58c163224b44e217b4239ca7b927d82bf6cc2fea1fc561d15056e3f7"
 
 [[package]]
 name = "unicode-ident"

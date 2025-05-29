@@ -1,6 +1,7 @@
 // Todo: improve this AST
 
-use serde::{Serialize, Deserialize};
+use designtime_jsx::RenderNode;
+use serde::{Deserialize, Serialize};
 
 /// Represents an import declaration in the source code
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -30,7 +31,12 @@ pub struct PageDecl {
 
 impl PageDecl {
     /// Creates a new page declaration
-    pub fn new<S: Into<String>>(name: S, layout: Option<S>, render: Vec<Node>, functions: Vec<Function>) -> Self {
+    pub fn new<S: Into<String>>(
+        name: S,
+        layout: Option<S>,
+        render: Vec<Node>,
+        functions: Vec<Function>,
+    ) -> Self {
         Self {
             name: name.into(),
             layout: layout.map(Into::into),
@@ -68,6 +74,7 @@ pub enum Node {
         children: Vec<Node>,
     },
     Fragment(Vec<Node>),
+    Expr(String),
 }
 
 impl Node {
@@ -77,11 +84,7 @@ impl Node {
     }
 
     /// Creates a new element node
-    pub fn element<S: Into<String>>(
-        name: S,
-        attrs: Vec<Attribute>,
-        children: Vec<Node>,
-    ) -> Self {
+    pub fn element<S: Into<String>>(name: S, attrs: Vec<Attribute>, children: Vec<Node>) -> Self {
         Node::Element {
             name: name.into(),
             attrs,
@@ -101,7 +104,7 @@ impl Node {
 
     fn visit_with_parent<V: NodeVisitor>(&self, visitor: &mut V, parent: Option<&Node>) {
         visitor.visit_node(self, parent);
-        
+
         if let Node::Element { children, .. } | Node::Fragment(children) = self {
             for child in children {
                 child.visit_with_parent(visitor, Some(self));
@@ -116,6 +119,27 @@ pub struct Function {
     pub name: String,
     pub params: Vec<String>,
     pub body: Vec<String>,
+}
+
+impl From<RenderNode> for Node {
+    fn from(rn: RenderNode) -> Self {
+        match rn {
+            RenderNode::Element {
+                tag_name,
+                attrs,
+                children,
+            } => Node::Element {
+                name: tag_name,
+                attrs: attrs
+                    .into_iter()
+                    .map(|(n, v)| Attribute { name: n, value: v })
+                    .collect(),
+                children: children.into_iter().map(Node::from).collect(),
+            },
+            RenderNode::Text(t) => Node::Text(t),
+            RenderNode::Expr(e) => Node::Expr(e),
+        }
+    }
 }
 
 impl Function {
@@ -180,6 +204,7 @@ impl NodeVisitor for PrintVisitor {
         self.print_indent();
         match node {
             Node::Text(text) => println!("Text: {:?}", text),
+            Node::Expr(expr) => println!("Expr: {{{}}}", expr),
             Node::Element { name, attrs, .. } => {
                 println!("Element: {} ({} attrs)", name, attrs.len());
             }
