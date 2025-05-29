@@ -1,4 +1,6 @@
-use designtime_rs::{ir::Program, lexer::Lexer, parser::Parser, validate_and_load_workspace};
+use designtime_rs::{
+    OpCode, VM, ir::Program, lexer::Lexer, parser::Parser, validate_and_load_workspace,
+};
 
 fn main() {
     let input = r#"
@@ -44,14 +46,23 @@ fn main() {
     println!("\n=== IR ===");
     println!("{:#?}", module);
 
-    // // Step 4: Generate JavaScript output using the React emitter
-    // let mut emitter = create_emitter(TargetPlatform::React);
-    // let js_code = emitter.emit_module(&module);
+    fn compile_example() -> Vec<OpCode> {
+        vec![
+            OpCode::Const(1.0),
+            OpCode::Const(2.0),
+            OpCode::Add,
+            OpCode::Const(3.0),
+            OpCode::Const(4.0),
+            OpCode::Sub,
+            OpCode::Mul,
+        ]
+    }
 
-    // println!("\n=== JavaScript ===");
-    // println!("{}", js_code);
+    let bytecode = compile_example();
 
-    // // Step 5: Write to output file
-    // std::fs::write("output.js", &js_code).expect("Failed to write output file");
-    // println!("\nOutput written to output.js");
+    let mut vm = VM::new();
+    match vm.run(&bytecode) {
+        Ok(result) => println!("=== Result ===\n{}", result),
+        Err(e) => eprintln!("Runtime error: {}", e),
+    }
 }
