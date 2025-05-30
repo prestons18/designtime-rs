@@ -1,6 +1,7 @@
 use crate::ast::{ASTNode, Function, ImportDecl, Node, PageDecl};
 use crate::lexer::Token;
 use designtime_jsx::{RenderNode, parse_render_block};
+
 pub struct Parser {
     tokens: Vec<Token>,
     pos: usize,
@@ -75,7 +76,7 @@ impl Parser {
         self.expect(Token::LBrace, "Expected '{' after page name");
 
         let mut layout = None;
-        let mut render_nodes = Vec::new(); // Changed to Vec
+        let mut render_nodes = Vec::new();
         let mut functions = Vec::new();
 
         while self.peek() != Token::RBrace {
@@ -94,13 +95,11 @@ impl Parser {
                     self.expect(Token::Colon, "Expected ':' after 'render'");
                     self.expect(Token::LBrace, "Expected '{' to start render block");
 
-                    // Extract the raw tokens inside render block as a string
                     let jsx_source = self.collect_until_closing_brace();
 
                     let root_node =
                         parse_render_block(&jsx_source).expect("Failed to parse JSX block");
 
-                    // Extract children from root element
                     if let RenderNode::Element { children, .. } = root_node {
                         render_nodes = children.into_iter().map(Node::from).collect();
                     } else {
@@ -129,10 +128,9 @@ impl Parser {
     fn collect_until_closing_brace(&mut self) -> String {
         let mut depth = 1;
         let mut jsx_tokens = Vec::new();
-        let mut expression_depth = 0; // Track JSX expression depth
+        let mut expression_depth = 0;
 
-        // Skip the opening brace
-        self.bump();
+        self.bump(); // skip opening '{'
 
         while depth > 0 {
             let token = self.bump();
@@ -157,40 +155,29 @@ impl Parser {
             }
         }
 
-        // Convert tokens to raw source string with proper JSX formatting
         Self::tokens_to_jsx_string(&jsx_tokens)
     }
 
-    // Improved JSX token reconstruction
     fn tokens_to_jsx_string(tokens: &[Token]) -> String {
         let mut result = String::new();
         let mut prev_token = None;
 
         for token in tokens {
-            // Add space when needed
             if let Some(prev) = prev_token {
                 match (prev, token) {
-                    // No space between these tokens
                     (Token::LT, _)
                     | (Token::Slash, _)
                     | (Token::EQ, _)
                     | (_, Token::GT)
                     | (_, Token::SlashGT) => {}
-
-                    // Add space after text
                     (Token::Text(_), Token::LT) => result.push(' '),
-
-                    // Add space between attributes
                     (Token::StringLiteral(_), Token::Ident(_))
                     | (Token::Ident(_), Token::Ident(_)) => result.push(' '),
-
-                    // Default: add space
                     _ => result.push(' '),
                 }
             }
-
             result.push_str(&token.to_string());
-            prev_token = Some(token.clone()); // Clone the token here
+            prev_token = Some(token.clone());
         }
 
         result
@@ -225,30 +212,28 @@ impl Parser {
             self.expect(Token::Colon, "Expected ':' after function name");
             self.skip_whitespace();
 
-            // Parse parameters
             let mut params = Vec::new();
             if self.peek() == Token::LParen {
-                self.bump(); // Consume '('
+                self.bump();
                 while self.peek() != Token::RParen {
                     if let Token::Ident(param) = self.bump() {
                         params.push(param.clone());
                         if self.peek() == Token::Comma {
-                            self.bump(); // Consume ','
+                            self.bump();
                         }
                     } else {
                         panic!("Expected parameter name");
                     }
                 }
-                self.bump(); // Consume ')'
+                self.bump();
             }
 
             self.skip_whitespace();
             self.expect(Token::Arrow, "Expected '=>' after parameters");
             self.skip_whitespace();
 
-            // Parse function body
             let body = if self.peek() == Token::LBrace {
-                self.bump(); // Consume '{'
+                self.bump();
                 let mut body_tokens = Vec::new();
                 let mut brace_count = 1;
 
@@ -268,10 +253,8 @@ impl Parser {
                     }
                 }
 
-                // Convert tokens to JavaScript code
                 vec![Self::tokens_to_js_string(&body_tokens)]
             } else {
-                // Single expression
                 let mut expr_tokens = Vec::new();
                 while !matches!(self.peek(), Token::Comma | Token::RBrace) {
                     expr_tokens.push(self.bump());
@@ -285,7 +268,7 @@ impl Parser {
             funcs.push(Function { name, params, body });
 
             if self.peek() == Token::Comma {
-                self.bump(); // Consume ','
+                self.bump();
             }
             self.skip_whitespace();
         }
@@ -294,7 +277,6 @@ impl Parser {
         funcs
     }
 
-    // Convert tokens to JavaScript code
     fn tokens_to_js_string(tokens: &[Token]) -> String {
         tokens
             .iter()
