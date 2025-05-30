@@ -97,9 +97,8 @@ impl Parser {
                     // Extract the raw tokens inside render block as a string
                     let jsx_source = self.collect_until_closing_brace();
 
-                    // Parse JSX using designtime-jsx crate
-                    let root_node = designtime_jsx::parse_render_block(&jsx_source)
-                        .expect("Failed to parse JSX block");
+                    let root_node =
+                        parse_render_block(&jsx_source).expect("Failed to parse JSX block");
 
                     // Extract children from root element
                     if let RenderNode::Element { children, .. } = root_node {
