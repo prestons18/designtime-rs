@@ -13,20 +13,20 @@ pub mod vm;
 pub mod workspace;
 
 pub use bytecode::{Bytecode, generate_bytecode};
-pub use ir::{IRNode, generate_ir};
+pub use ir::ir_node;
 pub use lexer::tokenize;
 pub use parser::parse;
 pub use targets::{TargetCodegen, jsx};
 pub use vm::{VMResult, VirtualMachine};
 pub use workspace::{ProjectConfig, Workspace};
 
-/// Compile source to IR
-pub fn compile_to_ir(source: &str) -> Result<ir::IRNode, String> {
-    let tokens = lexer::tokenize(source)?;
-    let ast = parser::parse(tokens)?;
-    let ir = ir::generate_ir(ast)?;
-    Ok(ir)
-}
+// /// Compile source to IR
+// pub fn compile_to_ir(source: &str) -> Result<ir::, String> {
+//     let tokens = lexer::tokenize(source)?;
+//     let ast = parser::parse(tokens)?;
+//     let ir = ir::generate_ir(ast)?;
+//     Ok(ir)
+// }
 
 /// Compile source to bytecode
 pub fn compile_to_bytecode(source: &str) -> Result<bytecode::Bytecode, String> {

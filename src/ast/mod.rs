@@ -51,6 +51,8 @@ impl PageDecl {
     }
 }
 
+// TODO: ComponentDecl
+
 /// Represents an HTML/JSX attribute
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Attribute {
