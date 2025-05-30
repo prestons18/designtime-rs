@@ -1,6 +1,4 @@
-use designtime_rs::{
-    OpCode, VM, ir::Program, lexer::Lexer, parser::Parser, validate_and_load_workspace,
-};
+use designtime_rs::{Parser, lexer::Lexer, util::compile_ast_to_ir, validate_and_load_workspace};
 
 fn main() {
     let input = r#"
@@ -30,39 +28,21 @@ fn main() {
     let config = validate_and_load_workspace();
     println!("Project loaded: {:?}", config.project.name);
 
-    // Step 1: Tokenize
     let tokens = Lexer::new(input).tokenize();
-    println!("\n=== Tokens ===");
-    println!("{:#?}", tokens);
+    println!("\n=== Tokens ===\n{:#?}", tokens);
 
-    // Step 2: Parse tokens into AST
-    let ast = Parser::new(tokens).parse();
-    println!("\n=== AST ===");
-    println!("{:#?}", ast);
+    let ast = match Parser::new(tokens).parse() {
+        Ok(ast) => ast,
+        Err(e) => {
+            eprintln!("Parse error: {}", e.message());
+            return;
+        }
+    };
+    println!("\n=== AST ===\n{:#?}", ast);
 
-    // Step 3: Compile to IR
-    let module = Program::from_ast(ast);
+    // Now compile AST to IR
+    let module = compile_ast_to_ir(&ast);
 
-    println!("\n=== IR ===");
-    println!("{:#?}", module);
-
-    fn compile_example() -> Vec<OpCode> {
-        vec![
-            OpCode::Const(1.0),
-            OpCode::Const(2.0),
-            OpCode::Add,
-            OpCode::Const(3.0),
-            OpCode::Const(4.0),
-            OpCode::Sub,
-            OpCode::Mul,
-        ]
-    }
-
-    let bytecode = compile_example();
-
-    let mut vm = VM::new();
-    match vm.run(&bytecode) {
-        Ok(result) => println!("=== Result ===\n{}", result),
-        Err(e) => eprintln!("Runtime error: {}", e),
-    }
+    // Then print or execute the IR
+    println!("\n=== IR Program ===\n{:#?}", module);
 }

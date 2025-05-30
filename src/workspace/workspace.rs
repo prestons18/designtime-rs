@@ -101,7 +101,7 @@ pub fn validate_and_load_workspace() -> WorkspaceConfig {
         for error in errors {
             println!("{error}");
         }
-        panic!("Invalid designtime.json");
+        println!("Invalid designtime.json") // todo: hook up to a global ErrorManager
     } else {
         println!("✅ designtime.json is valid!");
     }

@@ -1,14 +1,20 @@
+//! DesignTime Language Core Library
+//!
+//! This is the central crate for lexing, parsing, IR generation,
+//! bytecode generation, and VM execution. It will also support multi-target codegen (e.g. JSX).
+
 pub mod ast;
 pub mod ir;
 pub mod lexer;
 pub mod parser;
-pub mod vm;
+pub mod util;
 pub mod workspace;
 
-// Re-export commonly used items
-pub use ast::{ASTNode, Attribute, Function, ImportDecl, Node, PageDecl};
-pub use ir::*;
-pub use lexer::{Lexer, Token};
+//pub mod targets;
+// pub mod vm;
+// pub mod bytecode;
+
+pub use ir::ir_node;
+pub use lexer::token;
 pub use parser::Parser;
-pub use vm::{OpCode, VM};
-pub use workspace::*;
+pub use workspace::{WorkspaceConfig, validate_and_load_workspace};
