@@ -13,35 +13,28 @@ pub enum SyntaxError {
         found: Token,
         expected: Vec<Token>,
         pos: usize,
+        message: String,
     },
     MissingToken {
         expected: Token,
         pos: usize,
+        message: String,
     },
-    // TODO: Add more detailed errors & messages
 }
 
 impl SyntaxError {
     pub fn message(&self) -> String {
         match self {
-            SyntaxError::UnexpectedToken {
-                found, expected, ..
-            } => {
-                format!(
-                    "Unexpected token {:?}, expected one of {:?}",
-                    found, expected
-                )
-            }
-            SyntaxError::MissingToken { expected, .. } => {
-                format!("Expected token {:?}", expected)
-            }
+            SyntaxError::UnexpectedToken { message, .. }
+            | SyntaxError::MissingToken { message, .. } => message.clone(),
         }
     }
 
     pub fn span(&self) -> (usize, usize) {
         match self {
-            SyntaxError::UnexpectedToken { pos, .. } => (*pos, *pos + 1),
-            SyntaxError::MissingToken { pos, .. } => (*pos, *pos + 1),
+            SyntaxError::UnexpectedToken { pos, .. } | SyntaxError::MissingToken { pos, .. } => {
+                (*pos, *pos + 1)
+            }
         }
     }
 }
@@ -61,11 +54,31 @@ impl Parser {
         token
     }
 
-    fn unexpected_token_err(&self, expected: Vec<Token>) -> SyntaxError {
+    fn unexpected(&self, expected: Vec<Token>) -> SyntaxError {
+        self.unexpected_with_msg(expected, "Unexpected token")
+    }
+
+    fn unexpected_with_msg(&self, expected: Vec<Token>, msg: &str) -> SyntaxError {
+        let found = self.peek();
+        let expected_str = expected
+            .iter()
+            .map(|t| format!("{:?}", t))
+            .collect::<Vec<_>>()
+            .join(", ");
+
         SyntaxError::UnexpectedToken {
-            found: self.peek(),
+            found: found.clone(),
             expected,
             pos: self.pos,
+            message: format!("{msg}: `{found:?}`, expected one of: {expected_str}"),
+        }
+    }
+
+    fn missing(&self, expected: Token, msg: &str) -> SyntaxError {
+        SyntaxError::MissingToken {
+            expected,
+            pos: self.pos,
+            message: msg.to_string(),
         }
     }
 
@@ -75,69 +88,57 @@ impl Parser {
             match self.peek() {
                 Token::Import => items.push(ASTNode::Import(self.parse_import()?)),
                 Token::Page => items.push(ASTNode::Page(self.parse_page()?)),
-                _ => return Err(self.unexpected_token_err(vec![Token::Import, Token::Page])),
+                _ => return Err(self.unexpected(vec![Token::Import, Token::Page])),
             }
         }
         Ok(items)
     }
 
     fn parse_import(&mut self) -> Result<ImportDecl, SyntaxError> {
-        if self.bump() != Token::Import {
-            return Err(self.unexpected_token_err(vec![Token::Import]));
-        }
+        self.expect_token(
+            Token::Import,
+            "Expected 'import' keyword at start of import declaration",
+        )?;
+
         let mut names = Vec::new();
         if self.peek() == Token::LBrace {
-            self.bump(); // consume '{'
+            self.bump();
             while self.peek() != Token::RBrace {
                 match self.bump() {
-                    Token::Ident(n) => names.push(n.clone()),
-                    other => {
-                        return Err(SyntaxError::UnexpectedToken {
-                            found: other,
-                            expected: vec![Token::Ident(String::new())],
-                            pos: self.pos,
-                        });
+                    Token::Ident(n) => names.push(n),
+                    _ => {
+                        return Err(self.unexpected_with_msg(
+                            vec![Token::Ident(String::new())],
+                            "Expected identifier inside import braces",
+                        ));
                     }
                 }
                 if self.peek() == Token::Comma {
                     self.bump();
                 }
             }
-            self.bump(); // consume '}'
+            self.expect_token(Token::RBrace, "Expected '}' to close import specifiers")?;
         }
-        if self.peek() != Token::From {
-            return Err(SyntaxError::MissingToken {
-                expected: Token::From,
-                pos: self.pos,
-            });
-        }
-        self.bump(); // consume 'from'
+
+        self.expect_token(Token::From, "Expected 'from' after import specifiers")?;
+
         match self.bump() {
-            Token::StringLiteral(module) => Ok(ImportDecl {
-                names,
-                module: module.clone(),
-            }),
-            other => Err(SyntaxError::UnexpectedToken {
-                found: other,
-                expected: vec![Token::StringLiteral(String::new())],
-                pos: self.pos,
-            }),
+            Token::StringLiteral(module) => Ok(ImportDecl { names, module }),
+            _ => Err(self.unexpected_with_msg(
+                vec![Token::StringLiteral(String::new())],
+                "Expected module string after 'from'",
+            )),
         }
     }
 
     fn parse_page(&mut self) -> Result<PageDecl, SyntaxError> {
-        if self.bump() != Token::Page {
-            return Err(self.unexpected_token_err(vec![Token::Page]));
-        }
+        self.expect_token(Token::Page, "Expected 'page' keyword")?;
 
         let name = match self.bump() {
-            Token::Ident(n) => n.clone(),
-            other => {
-                return Err(SyntaxError::UnexpectedToken {
-                    found: other,
-                    expected: vec![Token::Ident(String::new())],
-                    pos: self.pos,
-                });
+            Token::Ident(n) => n,
+            _ => {
+                return Err(self
+                    .unexpected_with_msg(vec![Token::Ident(String::new())], "Expected page name"));
             }
         };
 
@@ -153,13 +154,12 @@ impl Parser {
                     self.bump();
                     self.expect_token(Token::Colon, "Expected ':' after 'layout'")?;
                     match self.bump() {
-                        Token::Ident(l) => layout = Some(l.clone()),
-                        other => {
-                            return Err(SyntaxError::UnexpectedToken {
-                                found: other,
-                                expected: vec![Token::Ident(String::new())],
-                                pos: self.pos,
-                            });
+                        Token::Ident(l) => layout = Some(l),
+                        _ => {
+                            return Err(self.unexpected_with_msg(
+                                vec![Token::Ident(String::new())],
+                                "Expected layout name",
+                            ));
                         }
                     }
                 }
@@ -171,21 +171,13 @@ impl Parser {
                     let jsx_source = self.collect_until_closing_brace()?;
 
                     let root_node = parse_render_block(&jsx_source).map_err(|_| {
-                        SyntaxError::UnexpectedToken {
-                            found: Token::Text("Invalid JSX".to_string()),
-                            expected: vec![],
-                            pos: self.pos,
-                        }
+                        self.unexpected_with_msg(vec![], "Failed to parse JSX in render block")
                     })?;
 
                     if let RenderNode::Element { children, .. } = root_node {
                         render_nodes = children.into_iter().map(Node::from).collect();
                     } else {
-                        return Err(SyntaxError::UnexpectedToken {
-                            found: Token::Text("JSX root not an element".to_string()),
-                            expected: vec![],
-                            pos: self.pos,
-                        });
+                        return Err(self.unexpected_with_msg(vec![], "JSX root must be an element"));
                     }
                 }
                 Token::Functions => {
@@ -193,17 +185,17 @@ impl Parser {
                     self.expect_token(Token::Colon, "Expected ':' after 'functions'")?;
                     functions = self.parse_functions()?;
                 }
-                other => {
-                    return Err(SyntaxError::UnexpectedToken {
-                        found: other,
-                        expected: vec![Token::Layout, Token::Render, Token::Functions],
-                        pos: self.pos,
-                    });
+                _ => {
+                    return Err(self.unexpected(vec![
+                        Token::Layout,
+                        Token::Render,
+                        Token::Functions,
+                    ]));
                 }
             }
         }
 
-        self.expect_token(Token::RBrace, "Expected '}' to close page")?;
+        self.expect_token(Token::RBrace, "Expected '}' to close page block")?;
 
         Ok(PageDecl {
             name,
@@ -218,7 +210,7 @@ impl Parser {
         let mut jsx_tokens = Vec::new();
         let mut expression_depth = 0;
 
-        self.bump(); // skip opening '{'
+        self.bump(); // consume initial {
 
         while depth > 0 {
             let token = self.bump();
@@ -239,10 +231,7 @@ impl Parser {
                     }
                 }
                 Token::EOF => {
-                    return Err(SyntaxError::MissingToken {
-                        expected: Token::RBrace,
-                        pos: self.pos,
-                    });
+                    return Err(self.missing(Token::RBrace, "Unterminated JSX block"));
                 }
                 _ => jsx_tokens.push(token),
             }
@@ -279,11 +268,7 @@ impl Parser {
     fn expect_token(&mut self, expected: Token, msg: &str) -> Result<(), SyntaxError> {
         let token = self.bump();
         if token != expected {
-            return Err(SyntaxError::UnexpectedToken {
-                found: token,
-                expected: vec![expected],
-                pos: self.pos,
-            });
+            return Err(self.unexpected_with_msg(vec![expected], msg));
         }
         Ok(())
     }
@@ -295,20 +280,19 @@ impl Parser {
     }
 
     fn parse_functions(&mut self) -> Result<Vec<Function>, SyntaxError> {
-        self.expect_token(Token::LBrace, "Expected '{' to start functions")?;
+        self.expect_token(Token::LBrace, "Expected '{' to start functions block")?;
         let mut funcs = Vec::new();
 
         while self.peek() != Token::RBrace {
             self.skip_whitespace();
 
             let name = match self.bump() {
-                Token::Ident(n) => n.clone(),
-                other => {
-                    return Err(SyntaxError::UnexpectedToken {
-                        found: other,
-                        expected: vec![Token::Ident(String::new())],
-                        pos: self.pos,
-                    });
+                Token::Ident(n) => n,
+                _ => {
+                    return Err(self.unexpected_with_msg(
+                        vec![Token::Ident(String::new())],
+                        "Expected function name",
+                    ));
                 }
             };
 
@@ -320,31 +304,29 @@ impl Parser {
                 self.bump(); // consume '('
                 while self.peek() != Token::RParen {
                     match self.bump() {
-                        Token::Ident(param) => params.push(param.clone()),
-                        other => {
-                            return Err(SyntaxError::UnexpectedToken {
-                                found: other,
-                                expected: vec![Token::Ident(String::new())],
-                                pos: self.pos,
-                            });
+                        Token::Ident(param) => params.push(param),
+                        _ => {
+                            return Err(self.unexpected_with_msg(
+                                vec![Token::Ident(String::new())],
+                                "Expected parameter name",
+                            ));
                         }
                     }
                     if self.peek() == Token::Comma {
                         self.bump();
                     }
                 }
-                self.bump(); // consume ')'
+                self.expect_token(Token::RParen, "Expected ')' to close parameter list")?;
             }
 
             self.skip_whitespace();
-            self.expect_token(Token::Arrow, "Expected '=>' after parameters")?;
+            self.expect_token(Token::Arrow, "Expected '=>' after function parameters")?;
             self.skip_whitespace();
 
             let body = if self.peek() == Token::LBrace {
                 self.collect_block_body()?
             } else {
-                let expr = self.bump();
-                expr.to_string()
+                self.bump().to_string()
             };
 
             funcs.push(Function {
@@ -352,10 +334,11 @@ impl Parser {
                 params,
                 body: vec![body],
             });
+
             self.skip_whitespace();
         }
 
-        self.expect_token(Token::RBrace, "Expected '}' to end functions")?;
+        self.expect_token(Token::RBrace, "Expected '}' to end functions block")?;
         Ok(funcs)
     }
 
@@ -379,11 +362,7 @@ impl Parser {
                     }
                 }
                 Token::EOF => {
-                    return Err(SyntaxError::UnexpectedToken {
-                        found: Token::EOF,
-                        expected: vec![Token::RBrace],
-                        pos: self.pos,
-                    });
+                    return Err(self.missing(Token::RBrace, "Unterminated function body"));
                 }
                 _ => body_tokens.push(token),
             }
