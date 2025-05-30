@@ -120,9 +120,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "designtime-jsx"
-version = "1.0.1"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3dae93e5dd0dd35ce7c781a55f5eb426f48218343265c458a745e2014fbe1b6e"
+checksum = "4379682f453eb8cf2455b7a5871ce732cc8810ee5873bf3e6a0f117383d86a64"
 dependencies = [
  "tl",
 ]
