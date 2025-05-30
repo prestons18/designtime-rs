@@ -1,0 +1,19 @@
+import { Checkbox } from "@designtime.core.ui.MUI"
+
+page Home {
+    layout: Glassmorphism
+    render: { 
+        <div class="container">
+            <h1>Welcome to DesignTime</h1>
+            <Checkbox checked={true}>Do you see this? {1+1}</Checkbox>
+        </div>
+    }
+    functions: {
+        onSelect: () => {
+            let x = 40;
+            let y = 2;
+            let result = x + y;
+            return result;
+        }
+    }
+}

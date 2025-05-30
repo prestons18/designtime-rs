@@ -9,6 +9,7 @@ pub mod lexer;
 pub mod parser;
 pub mod util;
 pub mod workspace;
+pub mod error;
 
 //pub mod targets;
 // pub mod vm;
@@ -18,3 +19,4 @@ pub use ir::ir_node;
 pub use lexer::token;
 pub use parser::Parser;
 pub use workspace::{WorkspaceConfig, validate_and_load_workspace};
+pub use error::LangError;
