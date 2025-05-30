@@ -5,7 +5,6 @@
 
 mod node_visitor;
 
-use designtime_jsx::RenderNode;
 use serde::{Deserialize, Serialize};
 
 pub use node_visitor::{NodeVisitor, PrintVisitor};
@@ -110,27 +109,6 @@ impl Node {
             for child in children {
                 child.visit_with_parent(visitor, Some(self));
             }
-        }
-    }
-}
-
-impl From<RenderNode> for Node {
-    fn from(rn: RenderNode) -> Self {
-        match rn {
-            RenderNode::Element {
-                tag_name,
-                attrs,
-                children,
-            } => Node::Element {
-                name: tag_name,
-                attrs: attrs
-                    .into_iter()
-                    .map(|(n, v)| Attribute { name: n, value: v })
-                    .collect(),
-                children: children.into_iter().map(Node::from).collect(),
-            },
-            RenderNode::Text(t) => Node::Text(t),
-            RenderNode::Expr(e) => Node::Expr(e),
         }
     }
 }

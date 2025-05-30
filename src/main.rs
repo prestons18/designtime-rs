@@ -43,6 +43,6 @@ fn main() {
     // Now compile AST to IR
     let module = compile_ast_to_ir(&ast);
 
-    // Then you can print or execute your IR
+    // Then print or execute the IR
     println!("\n=== IR Program ===\n{:#?}", module);
 }

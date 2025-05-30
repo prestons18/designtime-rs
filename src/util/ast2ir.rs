@@ -4,21 +4,42 @@ use crate::ir::{function::IrFunction, ir_node::IrNode, page::IrPage};
 
 fn ir_node_from_ast(node: &Node) -> IrNode {
     match node {
-        Node::Text(text) => IrNode::Text(text.clone()),
+        // Handle text nodes - skip empty ones
+        Node::Text(text) => {
+            let trimmed = text.trim();
+            if trimmed.is_empty() {
+                return IrNode::Fragment(Vec::new());
+            }
+            IrNode::Text(trimmed.to_string())
+        },
 
+        // Handle expressions
         Node::Expr(expr) => IrNode::Expr(expr.clone()),
 
+        // Handle elements
         Node::Element {
             name,
             attrs,
             children,
         } => {
-            let ir_attrs = attrs
+            // Convert attributes
+            let ir_attrs: Vec<_> = attrs
                 .iter()
                 .map(|a| (a.name.clone(), a.value.clone()))
                 .collect();
 
-            let ir_children = children.iter().map(ir_node_from_ast).collect();
+            // Process children recursively and flatten fragments
+            let mut ir_children = Vec::new();
+            for child in children {
+                let processed = ir_node_from_ast(child);
+                match processed {
+                    // Flatten fragments into parent
+                    IrNode::Fragment(nodes) => ir_children.extend(nodes),
+                    // Keep other nodes as is
+                    node => ir_children.push(node),
+                }
+            }
+
 
             IrNode::Element {
                 name: name.clone(),
@@ -27,19 +48,24 @@ fn ir_node_from_ast(node: &Node) -> IrNode {
             }
         }
 
-        Node::Fragment(children) => {
-            let ir_children = children.iter().map(ir_node_from_ast).collect();
 
-            IrNode::Fragment(ir_children)
+        // Handle fragments - this case might not be needed if we're flattening fragments above
+        Node::Fragment(children) => {
+            let mut nodes = Vec::new();
+            for child in children {
+                match ir_node_from_ast(child) {
+                    IrNode::Fragment(inner_nodes) => nodes.extend(inner_nodes),
+                    node => nodes.push(node),
+                }
+            }
+            IrNode::Fragment(nodes)
         }
     }
 }
 
 fn ir_function_from_ast(func: &Function) -> IrFunction {
-    // Convert params from Vec<String> to Vec<&String> for IrFunction::new
     let param_refs: Vec<&String> = func.params.iter().collect();
 
-    // Replace this with actual bytecode compilation logic
     let instructions = vec![
         Instruction::LoadParam(0),
         Instruction::LoadConst("10".to_string()),
@@ -55,7 +81,6 @@ fn ir_page_from_ast(page: &PageDecl) -> IrPage {
 
     let ir_functions = page.functions.iter().map(ir_function_from_ast).collect();
 
-    // Pass layout as Option<&String> using .as_ref()
     IrPage::new(
         &page.name,
         page.layout.as_ref(),

@@ -1,6 +1,10 @@
 use crate::ast::{ASTNode, Attribute, Function, ImportDecl, Node, PageDecl};
 use crate::lexer::Token;
-use designtime_jsx::{RenderNode, parse_render_block};
+use swc_common::{SourceMap};
+use swc_ecma_ast::{JSXElement, JSXElementChild, JSXAttrName, JSXAttrValue, JSXExpr, Expr};
+use swc_ecma_parser::EsSyntax;
+use swc_ecma_parser::{lexer::Lexer, Parser as SwcParser, StringInput, Syntax};
+use std::sync::Arc;
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -20,36 +24,45 @@ pub enum SyntaxError {
         pos: usize,
         message: String,
     },
+    JSXParseError {
+        message: String,
+        pos: usize,
+    },
 }
 
 impl SyntaxError {
     pub fn message(&self) -> String {
         match self {
             SyntaxError::UnexpectedToken { message, .. }
-            | SyntaxError::MissingToken { message, .. } => message.clone(),
+            | SyntaxError::MissingToken { message, .. }
+            | SyntaxError::JSXParseError { message, .. } => message.clone(),
         }
     }
 
     pub fn span(&self) -> (usize, usize) {
         match self {
-            SyntaxError::UnexpectedToken { pos, .. } | SyntaxError::MissingToken { pos, .. } => {
-                (*pos, *pos + 1)
-            }
+            SyntaxError::UnexpectedToken { pos, .. } 
+            | SyntaxError::MissingToken { pos, .. }
+            | SyntaxError::JSXParseError { pos, .. } => (*pos, *pos + 1),
         }
     }
 }
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
+        println!("Parser::new - initializing with {} tokens", tokens.len());
         Self { tokens, pos: 0 }
     }
 
     fn peek(&self) -> Token {
-        self.tokens.get(self.pos).unwrap_or(&Token::EOF).clone()
+        let token = self.tokens.get(self.pos).unwrap_or(&Token::EOF).clone();
+        println!("peek() at pos {}: {:?}", self.pos, token);
+        token
     }
 
     fn bump(&mut self) -> Token {
         let token = self.peek();
+        println!("bump() consuming token at pos {}: {:?}", self.pos, token);
         self.pos += 1;
         token
     }
@@ -83,14 +96,25 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Result<Vec<ASTNode>, SyntaxError> {
+        println!("Starting parse...");
         let mut items = Vec::new();
         while self.peek() != Token::EOF {
             match self.peek() {
-                Token::Import => items.push(ASTNode::Import(self.parse_import()?)),
-                Token::Page => items.push(ASTNode::Page(self.parse_page()?)),
-                _ => return Err(self.unexpected(vec![Token::Import, Token::Page])),
+                Token::Import => {
+                    println!("Parsing import at pos {}", self.pos);
+                    items.push(ASTNode::Import(self.parse_import()?));
+                }
+                Token::Page => {
+                    println!("Parsing page at pos {}", self.pos);
+                    items.push(ASTNode::Page(self.parse_page()?));
+                }
+                _ => {
+                    println!("Unexpected token at top level at pos {}", self.pos);
+                    return Err(self.unexpected(vec![Token::Import, Token::Page]));
+                }
             }
         }
+        println!("Finished parse with {} top-level items", items.len());
         Ok(items)
     }
 
@@ -167,19 +191,10 @@ impl Parser {
                     self.bump();
                     self.expect_token(Token::Colon, "Expected ':' after 'render'")?;
                     self.expect_token(Token::LBrace, "Expected '{' to start render block")?;
-
+                
                     let jsx_source = self.collect_jsx_block()?;
-
-                    let root_node = parse_render_block(&jsx_source).map_err(|e| {
-                        self.unexpected_with_msg(
-                            vec![],
-                            &format!("Failed to parse JSX in render block: {:?}", e),
-                        )
-                    })?;
-
-                    // Convert the parsed JSX into render nodes
-                    render_nodes = self.convert_render_node_to_nodes(root_node);
-                }
+                    render_nodes = self.parse_jsx_with_swc(&jsx_source)?;
+                }                
                 Token::Functions => {
                     self.bump();
                     self.expect_token(Token::Colon, "Expected ':' after 'functions'")?;
@@ -203,6 +218,199 @@ impl Parser {
             render: render_nodes,
             functions,
         })
+    }
+
+    fn parse_jsx_with_swc(&self, jsx_source: &str) -> Result<Vec<Node>, SyntaxError> {
+        // First check if the source is empty or just whitespace
+        if jsx_source.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Check if the source needs to be wrapped in a fragment
+        let wrapped_source = if jsx_source.trim_start().starts_with('<') {
+            jsx_source.to_string()
+        } else {
+            // If it's not a valid JSX element, wrap it in a fragment
+            format!("<>{}</>", jsx_source)
+        };
+
+        let cm = Arc::new(SourceMap::default());
+        let fm = cm.new_source_file(
+            swc_common::FileName::Anon.into(),
+            wrapped_source.clone(),
+        );
+
+        let lexer = Lexer::new(
+            Syntax::Es(EsSyntax {
+                jsx: true,
+                ..Default::default()
+            }),
+            swc_ecma_ast::EsVersion::Es2022,
+            StringInput::from(&*fm),
+            None,
+        );
+
+        let mut parser = SwcParser::new_from(lexer);
+
+        match parser.parse_expr() {
+            Ok(expr) => match &*expr {
+                Expr::JSXElement(jsx_elem) => self.convert_jsx_element_to_nodes(jsx_elem),
+                Expr::JSXFragment(frag) => {
+                    // Handle JSX fragments
+                    let mut nodes = Vec::new();
+                    for child in &frag.children {
+                        match child {
+                            swc_ecma_ast::JSXElementChild::JSXElement(elem) => {
+                                nodes.extend(self.convert_jsx_element_to_nodes(elem)?);
+                            }
+                            swc_ecma_ast::JSXElementChild::JSXText(text) => {
+                                let content = text.value.to_string();
+                                if !content.trim().is_empty() {
+                                    nodes.push(Node::Text(content));
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    Ok(nodes)
+                }
+                _ => Err(SyntaxError::JSXParseError {
+                    message: "Expected JSX element or fragment".to_string(),
+                    pos: self.pos,
+                }),
+            },
+            Err(e) => Err(SyntaxError::JSXParseError {
+                message: format!("Failed to parse JSX: {:?}", e),
+                pos: self.pos,
+            }),
+        }
+    }
+
+    fn convert_jsx_element_to_nodes(&self, jsx_elem: &JSXElement) -> Result<Vec<Node>, SyntaxError> {
+        let mut nodes = Vec::new();
+
+        // If this is a fragment (empty tag name), just process children
+        let tag_name = self.jsx_element_name_to_string(&jsx_elem.opening.name);
+        
+        if tag_name.is_empty() {
+            // Fragment - process children directly
+            for child in &jsx_elem.children {
+                nodes.extend(self.convert_jsx_child_to_nodes(child)?);
+            }
+        } else {
+            // Regular element
+            let attrs = jsx_elem.opening.attrs.iter()
+                .filter_map(|attr| self.convert_jsx_attr(attr))
+                .collect();
+
+            let mut children = Vec::new();
+            for child in &jsx_elem.children {
+                children.extend(self.convert_jsx_child_to_nodes(child)?);
+            }
+
+            nodes.push(Node::Element {
+                name: tag_name,
+                attrs,
+                children,
+            });
+        }
+
+        Ok(nodes)
+    }
+
+    fn convert_jsx_child_to_nodes(&self, child: &JSXElementChild) -> Result<Vec<Node>, SyntaxError> {
+        match child {
+            JSXElementChild::JSXText(text) => {
+                let content = text.value.to_string();
+                if content.trim().is_empty() {
+                    Ok(vec![])
+                } else {
+                    Ok(vec![Node::Text(content)])
+                }
+            }
+            JSXElementChild::JSXElement(elem) => {
+                self.convert_jsx_element_to_nodes(elem)
+            }
+            JSXElementChild::JSXExprContainer(expr_container) => {
+                if let JSXExpr::Expr(expr) = &expr_container.expr {
+                    // Convert the expression back to string for now
+                    // You might want to create a proper expression AST node
+                    Ok(vec![Node::Expr(format!("{:?}", expr))])
+                } else {
+                    Ok(vec![])
+                }
+            }
+            JSXElementChild::JSXFragment(fragment) => {
+                let mut nodes = Vec::new();
+                for child in &fragment.children {
+                    nodes.extend(self.convert_jsx_child_to_nodes(child)?);
+                }
+                Ok(nodes)
+            }
+            JSXElementChild::JSXSpreadChild(_) => {
+                // Handle spread children if needed
+                Ok(vec![])
+            }
+        }
+    }
+
+    fn jsx_element_name_to_string(&self, name: &swc_ecma_ast::JSXElementName) -> String {
+        match name {
+            swc_ecma_ast::JSXElementName::Ident(ident) => ident.sym.to_string(),
+            swc_ecma_ast::JSXElementName::JSXMemberExpr(member) => {
+                format!("{}.{}", 
+                    self.jsx_object_to_string(&member.obj),
+                    member.prop.sym
+                )
+            }
+            swc_ecma_ast::JSXElementName::JSXNamespacedName(ns) => {
+                format!("{}:{}", ns.ns.sym, ns.name.sym)
+            }
+        }
+    }
+
+    fn jsx_object_to_string(&self, obj: &swc_ecma_ast::JSXObject) -> String {
+        match obj {
+            swc_ecma_ast::JSXObject::Ident(ident) => ident.sym.to_string(),
+            swc_ecma_ast::JSXObject::JSXMemberExpr(member) => {
+                format!("{}.{}", 
+                    self.jsx_object_to_string(&member.obj),
+                    member.prop.sym
+                )
+            }
+        }
+    }
+
+    fn convert_jsx_attr(&self, attr: &swc_ecma_ast::JSXAttrOrSpread) -> Option<Attribute> {
+        match attr {
+            swc_ecma_ast::JSXAttrOrSpread::JSXAttr(jsx_attr) => {
+                let name = match &jsx_attr.name {
+                    JSXAttrName::Ident(ident) => ident.sym.to_string(),
+                    JSXAttrName::JSXNamespacedName(ns) => {
+                        format!("{}:{}", ns.ns.sym, ns.name.sym)
+                    }
+                };
+
+                let value = jsx_attr.value.as_ref().map(|v| match v {
+                    JSXAttrValue::Lit(lit) => match lit {
+                        swc_ecma_ast::Lit::Str(s) => s.value.to_string(),
+                        swc_ecma_ast::Lit::Num(n) => n.value.to_string(),
+                        swc_ecma_ast::Lit::Bool(b) => b.value.to_string(),
+                        _ => format!("{:?}", lit),
+                    },
+                    JSXAttrValue::JSXExprContainer(expr) => {
+                        format!("{{{:?}}}", expr.expr)
+                    }
+                    JSXAttrValue::JSXElement(elem) => {
+                        format!("<{}>", self.jsx_element_name_to_string(&elem.opening.name))
+                    }
+                    JSXAttrValue::JSXFragment(_) => "<>".to_string(),
+                }).unwrap_or_default();
+
+                Some(Attribute { name, value })
+            }
+            swc_ecma_ast::JSXAttrOrSpread::SpreadElement(_) => None,
+        }
     }
 
     fn collect_jsx_block(&mut self) -> Result<String, SyntaxError> {
@@ -242,7 +450,7 @@ impl Parser {
                     result.push('<');
                     i += 1;
 
-                    // Handle element name or closing tag
+                    // Handle possible closing tag
                     if i < tokens.len() && tokens[i] == Token::Slash {
                         result.push('/');
                         i += 1;
@@ -256,7 +464,7 @@ impl Parser {
                         }
                     }
 
-                    // Handle attributes
+                    // Attributes
                     while i < tokens.len() && !matches!(tokens[i], Token::GT | Token::SlashGT) {
                         match &tokens[i] {
                             Token::Ident(attr) => {
@@ -264,7 +472,7 @@ impl Parser {
                                 result.push_str(attr);
                                 i += 1;
 
-                                // Check for attribute value
+                                // Attribute value
                                 if i < tokens.len() && tokens[i] == Token::EQ {
                                     result.push('=');
                                     i += 1;
@@ -278,35 +486,13 @@ impl Parser {
                                                 i += 1;
                                             }
                                             Token::LBrace => {
-                                                // Handle JavaScript expression in braces
                                                 result.push('{');
                                                 i += 1;
-                                                let mut brace_depth = 1;
-
-                                                while i < tokens.len() && brace_depth > 0 {
-                                                    match &tokens[i] {
-                                                        Token::LBrace => {
-                                                            result.push('{');
-                                                            brace_depth += 1;
-                                                        }
-                                                        Token::RBrace => {
-                                                            brace_depth -= 1;
-                                                            if brace_depth > 0 {
-                                                                result.push('}');
-                                                            }
-                                                        }
-                                                        Token::Ident(id) => result.push_str(id),
-                                                        Token::Number(n) => {
-                                                            result.push_str(&n.to_string())
-                                                        }
-                                                        Token::Plus => result.push('+'),
-                                                        Token::Text(t) => result.push_str(t),
-                                                        _ => result
-                                                            .push_str(&format!("{:?}", tokens[i])),
-                                                    }
-                                                    i += 1;
-                                                }
+                                                let (expr, new_i) =
+                                                    self.reconstruct_expression(tokens, i);
+                                                result.push_str(&expr);
                                                 result.push('}');
+                                                i = new_i;
                                             }
                                             _ => {
                                                 result.push_str(&format!("{:?}", tokens[i]));
@@ -337,33 +523,12 @@ impl Parser {
                     i += 1;
                 }
                 Token::LBrace => {
-                    // Handle JavaScript expressions in JSX content
                     result.push('{');
                     i += 1;
-                    let mut brace_depth = 1;
-
-                    while i < tokens.len() && brace_depth > 0 {
-                        match &tokens[i] {
-                            Token::LBrace => {
-                                result.push('{');
-                                brace_depth += 1;
-                            }
-                            Token::RBrace => {
-                                brace_depth -= 1;
-                                if brace_depth > 0 {
-                                    result.push('}');
-                                }
-                            }
-                            Token::Number(n) => {
-                                result.push_str(&n.to_string());
-                            }
-                            Token::Plus => result.push('+'),
-                            Token::Ident(id) => result.push_str(id),
-                            _ => result.push_str(&format!("{:?}", tokens[i])),
-                        }
-                        i += 1;
-                    }
+                    let (expr, new_i) = self.reconstruct_expression(tokens, i);
+                    result.push_str(&expr);
                     result.push('}');
+                    i = new_i;
                 }
                 _ => {
                     i += 1;
@@ -374,30 +539,41 @@ impl Parser {
         result
     }
 
-    fn convert_render_node_to_nodes(&self, node: RenderNode) -> Vec<Node> {
-        match node {
-            RenderNode::Element {
-                tag_name,
-                attrs,
-                children,
-            } => {
-                vec![Node::Element {
-                    name: tag_name,
-                    attrs: attrs
-                        .into_iter()
-                        .map(|(n, v)| Attribute { name: n, value: v })
-                        .collect(),
-                    children: children
-                        .into_iter()
-                        .flat_map(|child| self.convert_render_node_to_nodes(child))
-                        .collect(),
-                }]
+    fn reconstruct_expression(&self, tokens: &[Token], start: usize) -> (String, usize) {
+        let mut result = String::new();
+        let mut i = start;
+        let mut brace_depth = 1;
+
+        while i < tokens.len() && brace_depth > 0 {
+            match &tokens[i] {
+                Token::LBrace => {
+                    result.push('{');
+                    brace_depth += 1;
+                }
+                Token::RBrace => {
+                    brace_depth -= 1;
+                    if brace_depth > 0 {
+                        result.push('}');
+                    }
+                }
+                Token::Ident(id) => result.push_str(id),
+                Token::Number(n) => result.push_str(&n.to_string()),
+                Token::Plus => result.push('+'),
+                Token::Minus => result.push('-'),
+                Token::Star => result.push('*'),
+                Token::Slash => result.push('/'),
+                Token::Text(t) => result.push_str(t),
+                Token::StringLiteral(s) => {
+                    result.push('"');
+                    result.push_str(s);
+                    result.push('"');
+                }
+                _ => result.push_str(&format!("{:?}", tokens[i])),
             }
-            RenderNode::Text(text) => {
-                vec![Node::Text(text)]
-            }
-            RenderNode::Expr(expr) => vec![Node::Expr(expr)],
+            i += 1;
         }
+
+        (result, i)
     }
 
     fn expect_token(&mut self, expected: Token, msg: &str) -> Result<(), SyntaxError> {
