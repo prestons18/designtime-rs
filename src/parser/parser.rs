@@ -1,4 +1,4 @@
-use crate::ast::{ASTNode, Function, ImportDecl, Node, PageDecl};
+use crate::ast::{ASTNode, Attribute, Function, ImportDecl, Node, PageDecl};
 use crate::lexer::Token;
 use designtime_jsx::{RenderNode, parse_render_block};
 
@@ -168,17 +168,17 @@ impl Parser {
                     self.expect_token(Token::Colon, "Expected ':' after 'render'")?;
                     self.expect_token(Token::LBrace, "Expected '{' to start render block")?;
 
-                    let jsx_source = self.collect_until_closing_brace()?;
+                    let jsx_source = self.collect_jsx_block()?;
 
-                    let root_node = parse_render_block(&jsx_source).map_err(|_| {
-                        self.unexpected_with_msg(vec![], "Failed to parse JSX in render block")
+                    let root_node = parse_render_block(&jsx_source).map_err(|e| {
+                        self.unexpected_with_msg(
+                            vec![],
+                            &format!("Failed to parse JSX in render block: {:?}", e),
+                        )
                     })?;
 
-                    if let RenderNode::Element { children, .. } = root_node {
-                        render_nodes = children.into_iter().map(Node::from).collect();
-                    } else {
-                        return Err(self.unexpected_with_msg(vec![], "JSX root must be an element"));
-                    }
+                    // Convert the parsed JSX into render nodes
+                    render_nodes = self.convert_render_node_to_nodes(root_node);
                 }
                 Token::Functions => {
                     self.bump();
@@ -205,29 +205,21 @@ impl Parser {
         })
     }
 
-    fn collect_until_closing_brace(&mut self) -> Result<String, SyntaxError> {
+    fn collect_jsx_block(&mut self) -> Result<String, SyntaxError> {
         let mut depth = 1;
         let mut jsx_tokens = Vec::new();
-        let mut expression_depth = 0;
 
-        self.bump(); // consume initial {
-
-        while depth > 0 {
+        while depth > 0 && self.peek() != Token::EOF {
             let token = self.bump();
             match &token {
                 Token::LBrace => {
-                    expression_depth += 1;
+                    depth += 1;
                     jsx_tokens.push(token);
                 }
                 Token::RBrace => {
-                    if expression_depth > 0 {
-                        expression_depth -= 1;
+                    depth -= 1;
+                    if depth > 0 {
                         jsx_tokens.push(token);
-                    } else {
-                        depth -= 1;
-                        if depth > 0 {
-                            jsx_tokens.push(token);
-                        }
                     }
                 }
                 Token::EOF => {
@@ -237,37 +229,180 @@ impl Parser {
             }
         }
 
-        Ok(Self::tokens_to_jsx_string(&jsx_tokens))
+        Ok(self.reconstruct_jsx(&jsx_tokens))
     }
 
-    fn tokens_to_jsx_string(tokens: &[Token]) -> String {
+    fn reconstruct_jsx(&self, tokens: &[Token]) -> String {
         let mut result = String::new();
-        let mut prev_token = None;
+        let mut i = 0;
 
-        for token in tokens {
-            if let Some(prev) = prev_token {
-                match (prev, token) {
-                    (Token::LT, _)
-                    | (Token::Slash, _)
-                    | (Token::EQ, _)
-                    | (_, Token::GT)
-                    | (_, Token::SlashGT) => {}
-                    (Token::Text(_), Token::LT) => result.push(' '),
-                    (Token::StringLiteral(_), Token::Ident(_))
-                    | (Token::Ident(_), Token::Ident(_)) => result.push(' '),
-                    _ => result.push(' '),
+        while i < tokens.len() {
+            match &tokens[i] {
+                Token::LT => {
+                    result.push('<');
+                    i += 1;
+
+                    // Handle element name or closing tag
+                    if i < tokens.len() && tokens[i] == Token::Slash {
+                        result.push('/');
+                        i += 1;
+                    }
+
+                    // Element name
+                    if i < tokens.len() {
+                        if let Token::Ident(name) = &tokens[i] {
+                            result.push_str(name);
+                            i += 1;
+                        }
+                    }
+
+                    // Handle attributes
+                    while i < tokens.len() && !matches!(tokens[i], Token::GT | Token::SlashGT) {
+                        match &tokens[i] {
+                            Token::Ident(attr) => {
+                                result.push(' ');
+                                result.push_str(attr);
+                                i += 1;
+
+                                // Check for attribute value
+                                if i < tokens.len() && tokens[i] == Token::EQ {
+                                    result.push('=');
+                                    i += 1;
+
+                                    if i < tokens.len() {
+                                        match &tokens[i] {
+                                            Token::StringLiteral(s) => {
+                                                result.push('"');
+                                                result.push_str(s);
+                                                result.push('"');
+                                                i += 1;
+                                            }
+                                            Token::LBrace => {
+                                                // Handle JavaScript expression in braces
+                                                result.push('{');
+                                                i += 1;
+                                                let mut brace_depth = 1;
+
+                                                while i < tokens.len() && brace_depth > 0 {
+                                                    match &tokens[i] {
+                                                        Token::LBrace => {
+                                                            result.push('{');
+                                                            brace_depth += 1;
+                                                        }
+                                                        Token::RBrace => {
+                                                            brace_depth -= 1;
+                                                            if brace_depth > 0 {
+                                                                result.push('}');
+                                                            }
+                                                        }
+                                                        Token::Ident(id) => result.push_str(id),
+                                                        Token::Number(n) => {
+                                                            result.push_str(&n.to_string())
+                                                        }
+                                                        Token::Plus => result.push('+'),
+                                                        Token::Text(t) => result.push_str(t),
+                                                        _ => result
+                                                            .push_str(&format!("{:?}", tokens[i])),
+                                                    }
+                                                    i += 1;
+                                                }
+                                                result.push('}');
+                                            }
+                                            _ => {
+                                                result.push_str(&format!("{:?}", tokens[i]));
+                                                i += 1;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            _ => {
+                                i += 1;
+                            }
+                        }
+                    }
+
+                    // Closing bracket
+                    if i < tokens.len() {
+                        match tokens[i] {
+                            Token::GT => result.push('>'),
+                            Token::SlashGT => result.push_str("/>"),
+                            _ => {}
+                        }
+                        i += 1;
+                    }
+                }
+                Token::Text(text) => {
+                    result.push_str(text);
+                    i += 1;
+                }
+                Token::LBrace => {
+                    // Handle JavaScript expressions in JSX content
+                    result.push('{');
+                    i += 1;
+                    let mut brace_depth = 1;
+
+                    while i < tokens.len() && brace_depth > 0 {
+                        match &tokens[i] {
+                            Token::LBrace => {
+                                result.push('{');
+                                brace_depth += 1;
+                            }
+                            Token::RBrace => {
+                                brace_depth -= 1;
+                                if brace_depth > 0 {
+                                    result.push('}');
+                                }
+                            }
+                            Token::Number(n) => {
+                                result.push_str(&n.to_string());
+                            }
+                            Token::Plus => result.push('+'),
+                            Token::Ident(id) => result.push_str(id),
+                            _ => result.push_str(&format!("{:?}", tokens[i])),
+                        }
+                        i += 1;
+                    }
+                    result.push('}');
+                }
+                _ => {
+                    i += 1;
                 }
             }
-            result.push_str(&token.to_string());
-            prev_token = Some(token.clone());
         }
 
         result
     }
 
+    fn convert_render_node_to_nodes(&self, node: RenderNode) -> Vec<Node> {
+        match node {
+            RenderNode::Element {
+                tag_name,
+                attrs,
+                children,
+            } => {
+                vec![Node::Element {
+                    name: tag_name,
+                    attrs: attrs
+                        .into_iter()
+                        .map(|(n, v)| Attribute { name: n, value: v })
+                        .collect(),
+                    children: children
+                        .into_iter()
+                        .flat_map(|child| self.convert_render_node_to_nodes(child))
+                        .collect(),
+                }]
+            }
+            RenderNode::Text(text) => {
+                vec![Node::Text(text)]
+            }
+            RenderNode::Expr(expr) => vec![Node::Expr(expr)],
+        }
+    }
+
     fn expect_token(&mut self, expected: Token, msg: &str) -> Result<(), SyntaxError> {
         let token = self.bump();
-        if token != expected {
+        if std::mem::discriminant(&token) != std::mem::discriminant(&expected) {
             return Err(self.unexpected_with_msg(vec![expected], msg));
         }
         Ok(())
@@ -324,7 +459,7 @@ impl Parser {
             self.skip_whitespace();
 
             let body = if self.peek() == Token::LBrace {
-                self.collect_block_body()?
+                self.collect_function_body()?
             } else {
                 self.bump().to_string()
             };
@@ -342,13 +477,13 @@ impl Parser {
         Ok(funcs)
     }
 
-    fn collect_block_body(&mut self) -> Result<String, SyntaxError> {
+    fn collect_function_body(&mut self) -> Result<String, SyntaxError> {
         let mut depth = 1;
         let mut body_tokens = Vec::new();
 
         self.bump(); // consume '{'
 
-        while depth > 0 {
+        while depth > 0 && self.peek() != Token::EOF {
             let token = self.bump();
             match &token {
                 Token::LBrace => {
@@ -368,6 +503,45 @@ impl Parser {
             }
         }
 
-        Ok(Self::tokens_to_jsx_string(&body_tokens))
+        // Convert function body tokens to proper JavaScript string
+        Ok(self.tokens_to_js_string(&body_tokens))
+    }
+
+    fn tokens_to_js_string(&self, tokens: &[Token]) -> String {
+        let mut result = String::new();
+
+        for (i, token) in tokens.iter().enumerate() {
+            if i > 0 {
+                // Add spacing between tokens as needed
+                match (&tokens[i - 1], token) {
+                    (Token::Ident(_), Token::Ident(_)) => result.push(' '),
+                    (Token::Ident(_), Token::EQ) => result.push(' '),
+                    (Token::EQ, _) => result.push(' '),
+                    (Token::Plus, _) => result.push(' '),
+                    (_, Token::Plus) => result.push(' '),
+                    _ => {}
+                }
+            }
+
+            match token {
+                Token::Ident(s) => result.push_str(s),
+                Token::Number(n) => result.push_str(&n.to_string()),
+                Token::StringLiteral(s) => {
+                    result.push('"');
+                    result.push_str(s);
+                    result.push('"');
+                }
+                Token::Plus => result.push('+'),
+                Token::EQ => result.push('='),
+                Token::SemiColon => result.push(';'),
+                Token::LBrace => result.push('{'),
+                Token::RBrace => result.push('}'),
+                Token::LParen => result.push('('),
+                Token::RParen => result.push(')'),
+                _ => result.push_str(&format!("{:?}", token)),
+            }
+        }
+
+        result
     }
 }
