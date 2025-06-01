@@ -1,0 +1,220 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "DesignTime Config Schema",
+    "type": "object",
+    "description": "Root configuration for DesignTime projects.",
+    "properties": {
+        "project": {
+            "type": "object",
+            "description": "Basic project metadata.",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "The name of the project."
+                },
+                "version": {
+                    "type": "string",
+                    "pattern": "^\\d+\\.\\d+\\.\\d+$",
+                    "description": "Semantic version of the project (e.g. '1.0.0')."
+                },
+                "description": {
+                    "type": "string",
+                    "description": "A brief description of the project."
+                }
+            },
+            "required": [
+                "name",
+                "version"
+            ],
+            "additionalProperties": false
+        },
+        "packages": {
+            "type": "object",
+            "description": "Package dependencies configuration.",
+            "properties": {
+                "dependencies": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "List of runtime package dependencies."
+                },
+                "devDependencies": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "List of development-only package dependencies."
+                }
+            },
+            "additionalProperties": false
+        },
+        "unocss": {
+            "type": "object",
+            "description": "UnoCSS integration settings.",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Enable or disable UnoCSS."
+                },
+                "preset": {
+                    "type": "string",
+                    "description": "UnoCSS preset to use (e.g., 'default')."
+                },
+                "configFile": {
+                    "type": "string",
+                    "description": "Path to custom UnoCSS configuration file."
+                },
+                "scan": {
+                    "type": "object",
+                    "description": "File scanning options for UnoCSS.",
+                    "properties": {
+                        "include": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Glob patterns for files to include in scanning."
+                        },
+                        "exclude": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Glob patterns for files to exclude from scanning."
+                        }
+                    },
+                    "additionalProperties": false
+                }
+            },
+            "required": [
+                "enabled"
+            ],
+            "additionalProperties": false
+        },
+        "routes": {
+            "type": "object",
+            "description": "Routing system configuration.",
+            "properties": {
+                "autoRegister": {
+                    "type": "boolean",
+                    "description": "Automatically register pages as routes."
+                },
+                "pagesDir": {
+                    "type": "string",
+                    "description": "Directory where page components are stored."
+                },
+                "exclude": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "List of paths or patterns to exclude from routing."
+                },
+                "notFoundPage": {
+                    "type": "string",
+                    "description": "Path to custom 404 Not Found page component."
+                }
+            },
+            "additionalProperties": false
+        },
+        "theme": {
+            "type": "object",
+            "description": "Theme configuration options.",
+            "properties": {
+                "default": {
+                    "type": "string",
+                    "description": "Default theme to apply."
+                },
+                "available": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "List of available themes."
+                },
+                "customStylesheet": {
+                    "type": "string",
+                    "description": "Path to a custom global stylesheet."
+                }
+            },
+            "additionalProperties": false
+        },
+        "components": {
+            "type": "object",
+            "description": "Component registration settings.",
+            "properties": {
+                "autoRegister": {
+                    "type": "boolean",
+                    "description": "Automatically register components found in directories."
+                },
+                "directories": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Directories to scan for components."
+                },
+                "aliases": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    },
+                    "description": "Aliases for component paths or names."
+                }
+            },
+            "additionalProperties": false
+        },
+        "build": {
+            "type": "object",
+            "description": "Build process configuration.",
+            "properties": {
+                "outputDir": {
+                    "type": "string",
+                    "description": "Directory where build output is generated."
+                },
+                "target": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Build target environments (e.g., 'es2020', 'node')."
+                },
+                "minify": {
+                    "type": "boolean",
+                    "description": "Enable or disable code minification."
+                },
+                "sourceMaps": {
+                    "type": "boolean",
+                    "description": "Generate source maps for debugging."
+                }
+            },
+            "additionalProperties": false
+        },
+        "devServer": {
+            "type": "object",
+            "description": "Development server settings.",
+            "properties": {
+                "port": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535,
+                    "description": "Port number for the dev server."
+                },
+                "hotReload": {
+                    "type": "boolean",
+                    "description": "Enable or disable hot module reloading."
+                },
+                "openBrowser": {
+                    "type": "boolean",
+                    "description": "Open browser automatically on server start."
+                }
+            },
+            "additionalProperties": false
+        }
+    },
+    "required": [
+        "project"
+    ],
+    "additionalProperties": false
+}

@@ -1,0 +1,74 @@
+{
+    "project": {
+        "name": "MyDesignTimeApp",
+        "version": "1.0.0",
+        "description": "A DesignTime project"
+    },
+    "packages": {
+        "dependencies": [
+            "@designtime.core.ui.MUI",
+            "my-company.custom-components"
+        ],
+        "devDependencies": [
+            "@designtime.tooling.unocss"
+        ]
+    },
+    "unocss": {
+        "enabled": true,
+        "preset": "uno",
+        "configFile": "uno.config.ts",
+        "scan": {
+            "include": [
+                "src/**/*.{ts,tsx,js,jsx,html}"
+            ],
+            "exclude": [
+                "node_modules",
+                "dist"
+            ]
+        }
+    },
+    "routes": {
+        "autoRegister": true,
+        "pagesDir": "src/pages",
+        "exclude": [
+            "**/admin/**",
+            "**/private/**"
+        ],
+        "notFoundPage": "src/pages/404.dt"
+    },
+    "theme": {
+        "default": "Glassmorphism",
+        "available": [
+            "Glassmorphism",
+            "Neumorphism",
+            "Classic",
+            "DarkMode"
+        ],
+        "customStylesheet": "src/styles/theme.css"
+    },
+    "components": {
+        "autoRegister": true,
+        "directories": [
+            "src/components",
+            "node_modules/@designtime.core.ui.MUI/components"
+        ],
+        "aliases": {
+            "MUI": "@designtime.core.ui.MUI",
+            "Custom": "my-company.custom-components"
+        }
+    },
+    "build": {
+        "outputDir": "dist",
+        "target": [
+            "web",
+            "mobile"
+        ],
+        "minify": true,
+        "sourceMaps": false
+    },
+    "devServer": {
+        "port": 4000,
+        "hotReload": true,
+        "openBrowser": true
+    }
+}

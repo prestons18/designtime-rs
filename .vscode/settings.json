@@ -1,0 +1,10 @@
+{
+    "json.schemas": [
+        {
+            "fileMatch": [
+                "designtime.json"
+            ],
+            "url": "./designtime.schema.json"
+        }
+    ]
+} // todo in extension
