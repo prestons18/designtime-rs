@@ -1,38 +1,53 @@
-use crate::{workspace::WorkspaceConfig};
+use crate::{Lexer, Node, Parser, styleman::StyleMan, workspace::WorkspaceConfig};
 
 pub struct Runtime {
-    workspace: WorkspaceConfig,
-    // TODO: add more fields like style man, cache, etc
+    pub workspace: WorkspaceConfig,
+    pub style_manager: Option<StyleMan>,
 }
 
 impl Runtime {
     pub fn new(workspace: WorkspaceConfig) -> Self {
-        Self { workspace }
+        Self {
+            workspace,
+            style_manager: Some(StyleMan::new()),
+        }
     }
 
-    pub fn process_unocss(&self) {
-        if let Some(unocss) = &self.workspace.unocss {
-            if unocss.enabled {
-                println!("UnoCSS is enabled");
-                if let Some(preset) = &unocss.preset {
-                    println!("Using preset: {}", preset);
-                }
-                if let Some(config_file) = &unocss.config_file {
-                    println!("Using config file: {}", config_file);
-                }
-                if let Some(scan) = &unocss.scan {
-                    println!("Scan includes: {:?}", scan.include);
-                    println!("Scan excludes: {:?}", scan.exclude);
-                }
-
-                // TODO: Call the style man's function to load / initialize
-                // For example:
-                // style_man::load_unocss(unocss);
-            } else {
-                println!("UnoCSS is disabled");
+    pub fn process_node_for_styles(&mut self, node: &Node) {
+        // Only handle Element nodes with classes
+        if let Node::Element {
+            class_names,
+            children,
+            ..
+        } = node
+        {
+            if let Some(style_manager) = &mut self.style_manager {
+                style_manager.add_classes(class_names.clone());
             }
-        } else {
-            println!("No UnoCSS config found");
+            // Recursively process children
+            for child in children {
+                self.process_node_for_styles(child);
+            }
+        }
+    }
+
+    pub fn run(&mut self, source: &str) {
+        let lexer = Lexer::new(source);
+        let mut parser = Parser::new(lexer);
+        match parser.parse() {
+            Ok(node) => {
+                println!("Parsed AST: {:#?}", node);
+
+                // First process all nodes to collect styles
+                self.process_node_for_styles(&node);
+
+                // Then generate CSS if we have a style manager
+                if let Some(style_manager) = &mut self.style_manager {
+                    let css = style_manager.generate_css();
+                    println!("Generated CSS:\n{}", css);
+                }
+            }
+            Err(e) => eprintln!("Parse error: {}", e),
         }
     }
 }

@@ -1,9 +1,11 @@
-pub mod lexer;
 pub mod ast;
-pub mod parser;
 pub mod engine;
+pub mod lexer;
+pub mod parser;
+pub mod styleman;
 
-pub use lexer::Lexer;
 pub use ast::Node;
-pub use parser::Parser;
 pub use engine::*;
+pub use lexer::Lexer;
+pub use parser::Parser;
+pub use styleman::StyleMan;

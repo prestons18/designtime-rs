@@ -1,4 +1,4 @@
-use designtime_rs::{workspace, Lexer, Parser, Runtime};
+use designtime_rs::{workspace, Runtime, StyleMan};
 use workspace::validate_and_load_workspace;
 use std::path::Path;
 
@@ -16,16 +16,7 @@ fn main() {
         }
     };
 
-    let runtime = Runtime::new(workspace_config);
-    runtime.process_unocss();
-
-    // Now read and parse the .dts source file
+    let mut runtime = Runtime::new(workspace_config);
     let source = include_str!("examples/night01.page.dts");
-    let lexer = Lexer::new(source);
-    let mut parser = Parser::new(lexer);
-
-    match parser.parse() {
-        Ok(node) => println!("{:#?}", node),
-        Err(e) => eprintln!("Parse error: {}", e),
-    }
+    runtime.run(source);
 }

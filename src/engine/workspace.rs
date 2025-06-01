@@ -90,14 +90,6 @@ impl WorkspaceConfig {
     pub fn is_unocss_enabled(&self) -> bool {
         self.unocss.as_ref().map_or(false, |u| u.enabled)
     }
-
-    pub fn get_unocss_scan_include(&self) -> Vec<String> {
-        self.unocss
-            .as_ref()
-            .and_then(|u| u.scan.as_ref())
-            .and_then(|s| s.include.clone())
-            .unwrap_or_default()
-    }
 }
 
 pub fn watch_workspace_config(path: &Path, on_change: impl Fn() + Send + 'static) {
