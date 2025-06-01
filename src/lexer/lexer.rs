@@ -54,6 +54,40 @@ impl<'a> Lexer<'a> {
                     self.in_tag = false;
                     Token { kind: TokenKind::Gt, line, column }
                 }
+                Some('=') => {
+                    self.next_char();
+                    Token {
+                        kind: TokenKind::Eq,
+                        line,
+                        column,
+                    }
+                }
+                Some('"') => {
+                    self.next_char(); // consume opening quote
+                    let mut value = String::new();
+                    while let Some(ch) = self.peek_char() {
+                        if ch == '"' {
+                            self.next_char(); // consume closing quote
+                            break;
+                        }
+                        value.push(ch);
+                        self.next_char();
+                    }
+                    Token { kind: TokenKind::StringLiteral(value), line, column }
+                }                
+                Some('\'') => {
+                    self.next_char(); // consume opening quote
+                    let mut value = String::new();
+                    while let Some(ch) = self.peek_char() {
+                        if ch == '\'' {
+                            self.next_char(); // consume closing quote
+                            break;
+                        }
+                        value.push(ch);
+                        self.next_char();
+                    }
+                    Token { kind: TokenKind::StringLiteral(value), line, column }
+                }                
                 Some('/') => {
                     self.next_char();
                     Token { kind: TokenKind::Slash, line, column }

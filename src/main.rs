@@ -1,7 +1,7 @@
 use designtime_rs::{Lexer, Parser};
 
 fn main() {
-    let source = "<div>Hello world</div>";
+    let source = include_str!("examples/night01.page.dts");
     let lexer = Lexer::new(source);
     let mut parser = Parser::new(lexer);
 

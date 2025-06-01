@@ -1,12 +1,17 @@
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
-    Lt,           // <
-    Gt,           // >
-    Slash,        // /
-    Name(String), // tag names like div, span
-    Text(String), // text
-    InnerText(String), // inner text
-    Unknown(char), // unknown char
+    Lt, // <
+    Gt, // >
+
+    Slash, // /
+    Eq,    // =
+
+    Name(String),          // tag names like div, span
+    Text(String),          // text
+    InnerText(String),     // inner text
+    StringLiteral(String), // string literal
+    Unknown(char),         // unknown char
+
     EOF,
 }
 

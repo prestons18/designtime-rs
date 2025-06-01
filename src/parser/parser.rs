@@ -31,6 +31,9 @@ impl<'a> Parser<'a> {
         };
         self.bump();
 
+        // Parse attributes before expecting '>'
+        let class_names = self.parse_attributes()?;
+
         if self.current.kind != TokenKind::Gt {
             return Err(format!("Expected >, got {:?}", self.current.kind));
         }
@@ -70,6 +73,42 @@ impl<'a> Parser<'a> {
         }
         self.bump();
 
-        Ok(Node::Element { tag_name, children })
+        Ok(Node::Element { tag_name, class_names, children })
+    }
+
+    fn parse_attributes(&mut self) -> Result<Vec<String>, String> {
+        let mut class_names = Vec::new();
+
+        while self.current.kind != TokenKind::Gt {
+            // Expect attribute name
+            let attr_name = match &self.current.kind {
+                TokenKind::Name(name) => name.clone(),
+                _ => return Err(format!("Expected attribute name, got {:?}", self.current.kind)),
+            };
+            self.bump();
+
+            // Expect '='
+            if self.current.kind != TokenKind::Eq {
+                return Err(format!("Expected '=', got {:?}", self.current.kind));
+            }
+            self.bump();
+
+            // Expect attribute value as string literal (Text token here)
+            let attr_value = match &self.current.kind {
+                TokenKind::StringLiteral(value) => value.clone(),
+                _ => return Err(format!("Expected string literal, got {:?}", self.current.kind)),
+            };
+            self.bump();
+
+            if attr_name == "class" {
+                // Split class string by whitespace into Vec<String>
+                class_names = attr_value
+                    .split_whitespace()
+                    .map(|s| s.to_string())
+                    .collect();
+            }
+        }
+
+        Ok(class_names)
     }
 }
