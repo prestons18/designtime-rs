@@ -1,22 +1,16 @@
-use designtime_rs::{workspace, Runtime, StyleMan};
-use workspace::validate_and_load_workspace;
-use std::path::Path;
+use designtime_rs::{
+    engine::Runtime, validate_and_load_workspace, watchman
+};
+use std::path::PathBuf;
 
-fn main() {
-    // Load workspace config (from current directory right now)
-    let config_path = Path::new("./designtime.json");
-    let workspace_config = match validate_and_load_workspace(config_path) {
-        Ok(cfg) => {
-            println!("✅ Loaded workspace config: {:?}", cfg.project.name);
-            cfg
-        }
-        Err(e) => {
-            eprintln!("Failed to load workspace config: {}", e);
-            std::process::exit(1);
-        }
-    };
+#[tokio::main]
+async fn main() -> Result<(), anyhow::Error> {
+    let workspace = PathBuf::from("./designtime.json");
+    let config = validate_and_load_workspace(workspace).expect("Failed to load workspace config");
 
-    let mut runtime = Runtime::new(workspace_config);
-    let source = include_str!("examples/night01.page.dts");
-    runtime.run(source);
+    // Create runtime with the config
+    let runtime = Runtime::new(config);
+    
+    // Start watchman with the runtime
+    watchman(runtime).await
 }

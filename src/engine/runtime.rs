@@ -31,6 +31,22 @@ impl Runtime {
         }
     }
 
+    pub fn process_source(&mut self, source: &str) -> Result<String, String> {
+        let lexer = Lexer::new(source);
+        let mut parser = Parser::new(lexer);
+        let node = parser.parse()?;
+
+        self.style_manager = Some(StyleMan::new()); // Reset styles each time
+
+        self.process_node_for_styles(&node);
+
+        if let Some(style_manager) = &self.style_manager {
+            Ok(style_manager.generate_css())
+        } else {
+            Ok(String::new())
+        }
+    }
+
     pub fn run(&mut self, source: &str) {
         let lexer = Lexer::new(source);
         let mut parser = Parser::new(lexer);
