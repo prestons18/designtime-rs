@@ -9,7 +9,7 @@ use std::sync::mpsc::channel;
 pub struct WorkspaceConfig {
     pub project: ProjectInfo,
     pub packages: Option<Packages>,
-    pub unocss: Option<UnoCSS>,
+    pub styleman: Option<StyleMan>,
     pub routes: Option<Routes>,
     pub theme: Option<Theme>,
     pub components: Option<Components>,
@@ -30,16 +30,11 @@ pub struct Packages {
     pub dev_dependencies: Option<Vec<String>>,
 }
 
-#[derive(Debug, Deserialize, Default)]
-pub struct UnoCSS {
+
+#[derive(Debug, Deserialize)]
+pub struct StyleMan {
     #[serde(default)]
     pub enabled: bool,
-    #[serde(default)]
-    pub preset: Option<String>,
-    #[serde(default)]
-    pub config_file: Option<String>,
-    #[serde(default)]
-    pub scan: Option<Scan>,
 }
 
 
@@ -87,8 +82,8 @@ pub struct DevServer {
 }
 
 impl WorkspaceConfig {
-    pub fn is_unocss_enabled(&self) -> bool {
-        self.unocss.as_ref().map_or(false, |u| u.enabled)
+    pub fn is_styleman_enabled(&self) -> bool {
+        self.styleman.as_ref().map_or(false, |u| u.enabled)
     }
 }
 

@@ -49,42 +49,13 @@
             },
             "additionalProperties": false
         },
-        "unocss": {
+        "styleman": {
             "type": "object",
-            "description": "UnoCSS integration settings.",
+            "description": "StyleMan Engine settings.",
             "properties": {
                 "enabled": {
                     "type": "boolean",
-                    "description": "Enable or disable UnoCSS."
-                },
-                "preset": {
-                    "type": "string",
-                    "description": "UnoCSS preset to use (e.g., 'default')."
-                },
-                "configFile": {
-                    "type": "string",
-                    "description": "Path to custom UnoCSS configuration file."
-                },
-                "scan": {
-                    "type": "object",
-                    "description": "File scanning options for UnoCSS.",
-                    "properties": {
-                        "include": {
-                            "type": "array",
-                            "items": {
-                                "type": "string"
-                            },
-                            "description": "Glob patterns for files to include in scanning."
-                        },
-                        "exclude": {
-                            "type": "array",
-                            "items": {
-                                "type": "string"
-                            },
-                            "description": "Glob patterns for files to exclude from scanning."
-                        }
-                    },
-                    "additionalProperties": false
+                    "description": "Enable or disable StyleMan."
                 }
             },
             "required": [

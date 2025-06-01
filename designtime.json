@@ -10,22 +10,11 @@
             "my-company.custom-components"
         ],
         "devDependencies": [
-            "@designtime.tooling.unocss"
+            "@designtime.tooling.watchman"
         ]
     },
-    "unocss": {
-        "enabled": true,
-        "preset": "uno",
-        "configFile": "uno.config.ts",
-        "scan": {
-            "include": [
-                "src/**/*.{ts,tsx,js,jsx,html}"
-            ],
-            "exclude": [
-                "node_modules",
-                "dist"
-            ]
-        }
+    "styleman": {
+        "enabled": true
     },
     "routes": {
         "autoRegister": true,
