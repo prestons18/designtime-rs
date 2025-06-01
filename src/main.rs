@@ -1,6 +1,22 @@
-use designtime_rs::{Lexer, Parser};
+use designtime_rs::{workspace, Lexer, Parser};
+use workspace::validate_and_load_workspace;
+use std::path::Path;
 
 fn main() {
+    // Load workspace config (from current directory right now)
+    let config_path = Path::new("./designtime.json");
+    let workspace_config = match validate_and_load_workspace(config_path) {
+        Ok(cfg) => {
+            println!("✅ Loaded workspace config: {:?}", cfg.project.name);
+            cfg
+        }
+        Err(e) => {
+            eprintln!("Failed to load workspace config: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    // Now read and parse the .dts source file
     let source = include_str!("examples/night01.page.dts");
     let lexer = Lexer::new(source);
     let mut parser = Parser::new(lexer);

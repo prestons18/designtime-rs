@@ -1,7 +1,9 @@
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
-use std::fs;
+use std::path::Path;
+use notify::{recommended_watcher, RecursiveMode, Watcher};
+use std::sync::mpsc::channel;
 
 #[derive(Debug, Deserialize)]
 pub struct WorkspaceConfig {
@@ -28,13 +30,18 @@ pub struct Packages {
     pub dev_dependencies: Option<Vec<String>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 pub struct UnoCSS {
+    #[serde(default)]
     pub enabled: bool,
+    #[serde(default)]
     pub preset: Option<String>,
+    #[serde(default)]
     pub config_file: Option<String>,
+    #[serde(default)]
     pub scan: Option<Scan>,
 }
+
 
 #[derive(Debug, Deserialize)]
 pub struct Scan {
@@ -79,32 +86,59 @@ pub struct DevServer {
     pub open_browser: Option<bool>,
 }
 
-pub fn validate_and_load_workspace() -> WorkspaceConfig {
-    let schema_str =
-        fs::read_to_string("./designtime.schema.json").expect("Missing designtime.schema.json");
-    let config_str = fs::read_to_string("./designtime.json").expect("Missing designtime.json");
-
-    let schema: Value = serde_json::from_str(&schema_str).expect("Invalid schema JSON");
-    let config: Value = serde_json::from_str(&config_str).expect("Invalid config JSON");
-
-    let validator = jsonschema::validator_for(&schema).expect("Failed to compile schema");
-
-    let mut errors = Vec::new();
-    for error in validator.iter_errors(&config) {
-        errors.push(format!(
-            "❌ Validation error at {}: {}",
-            error.instance_path, error
-        ));
+impl WorkspaceConfig {
+    pub fn is_unocss_enabled(&self) -> bool {
+        self.unocss.as_ref().map_or(false, |u| u.enabled)
     }
+
+    pub fn get_unocss_scan_include(&self) -> Vec<String> {
+        self.unocss
+            .as_ref()
+            .and_then(|u| u.scan.as_ref())
+            .and_then(|s| s.include.clone())
+            .unwrap_or_default()
+    }
+}
+
+pub fn watch_workspace_config(path: &Path, on_change: impl Fn() + Send + 'static) {
+    let (tx, rx) = channel();
+    let mut watcher = recommended_watcher(tx).expect("Failed to create watcher");
+
+    watcher.watch(path, RecursiveMode::NonRecursive).expect("Failed to watch file");
+
+    std::thread::spawn(move || {
+        loop {
+            match rx.recv() {
+                Ok(event) => {
+                    println!("Config changed: {:?}", event);
+                    on_change();
+                }
+                Err(e) => println!("Watch error: {:?}", e),
+            }
+        }
+    });
+}
+
+pub fn validate_and_load_workspace<P: AsRef<std::path::Path>>(path: P) -> Result<WorkspaceConfig, anyhow::Error> {
+    let schema_str = include_str!("../../designtime.schema.json"); // todo: make this configurable
+    let config_str = std::fs::read_to_string(path)?;
+
+    let schema: Value = serde_json::from_str(schema_str)?;
+    let config: Value = serde_json::from_str(&config_str)?;
+
+    let validator = jsonschema::validator_for(&schema)?;
+
+    let errors: Vec<String> = validator
+        .validate(&config)
+        .err()
+        .map(|e| e.to_string())
+        .into_iter()
+        .collect();
 
     if !errors.is_empty() {
-        for error in errors {
-            println!("{error}");
-        }
-        println!("Invalid designtime.json") // todo: hook up to a global ErrorManager
-    } else {
-        println!("✅ designtime.json is valid!");
+        anyhow::bail!("Config validation errors:\n{}", errors.join("\n"));
     }
 
-    serde_json::from_value(config).expect("Failed to deserialize designtime.json")
+    let workspace_config = serde_json::from_value(config)?;
+    Ok(workspace_config)
 }
