@@ -1,0 +1,10 @@
+[package]
+name = "designtime_rs"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "designtime_rs"
+file = "src/lib.rs"
+
+[dependencies]
