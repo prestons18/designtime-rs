@@ -1,0 +1,8 @@
+#[derive(Debug, Clone)]
+pub enum Node {
+    Element {
+        tag_name: String,
+        children: Vec<Node>,
+    },
+    Text(String),
+}

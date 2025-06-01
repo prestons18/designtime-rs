@@ -1,14 +1,12 @@
-use designtime_rs::{lexer::TokenKind, Lexer};
+use designtime_rs::{Lexer, Parser};
 
 fn main() {
     let source = "<div>Hello world</div>";
-    let mut lexer = Lexer::new(source);
+    let lexer = Lexer::new(source);
+    let mut parser = Parser::new(lexer);
 
-    loop {
-        let token = lexer.next_token();
-        println!("{:?}", token);
-        if token.kind == TokenKind::EOF {
-            break;
-        }
+    match parser.parse() {
+        Ok(node) => println!("{:#?}", node),
+        Err(e) => eprintln!("Parse error: {}", e),
     }
 }
