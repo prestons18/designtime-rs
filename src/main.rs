@@ -1,4 +1,4 @@
-use designtime_rs::{workspace, Lexer, Parser};
+use designtime_rs::{workspace, Lexer, Parser, Runtime};
 use workspace::validate_and_load_workspace;
 use std::path::Path;
 
@@ -15,6 +15,9 @@ fn main() {
             std::process::exit(1);
         }
     };
+
+    let runtime = Runtime::new(workspace_config);
+    runtime.process_unocss();
 
     // Now read and parse the .dts source file
     let source = include_str!("examples/night01.page.dts");
