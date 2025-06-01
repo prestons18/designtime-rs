@@ -4,7 +4,9 @@ pub enum TokenKind {
     Gt,           // >
     Slash,        // /
     Name(String), // tag names like div, span
-    Text(String), // inner text
+    Text(String), // text
+    InnerText(String), // inner text
+    Unknown(char), // unknown char
     EOF,
 }
 

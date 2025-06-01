@@ -1,13 +1,14 @@
 // Simple lexer
 
-use crate::lexer::tokens::{Token, TokenKind};
 use crate::lexer::line_tracker::LineTracker;
+use crate::lexer::tokens::{Token, TokenKind};
 
 pub struct Lexer<'a> {
     input: &'a str,
     chars: std::str::Chars<'a>,
     peeked: Option<char>,
     line_tracker: LineTracker,
+    in_tag: bool,
 }
 
 impl<'a> Lexer<'a> {
@@ -17,6 +18,7 @@ impl<'a> Lexer<'a> {
             chars: input.chars(),
             peeked: None,
             line_tracker: LineTracker::new(),
+            in_tag: false,
         }
     }
 
@@ -41,43 +43,64 @@ impl<'a> Lexer<'a> {
 
     pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
-
+    
         let (line, column) = self.line_tracker.position();
-
-        match self.next_char() {
-            Some('<') => Token { kind: TokenKind::Lt, line, column },
-            Some('>') => Token { kind: TokenKind::Gt, line, column },
-            Some('/') => Token { kind: TokenKind::Slash, line, column },
-            Some(c) if is_name_start_char(c) => {
-                let mut name = String::new();
-                name.push(c);
-                while let Some(&next_c) = self.peek_char().as_ref() {
-                    if is_name_char(next_c) {
-                        name.push(next_c);
-                        self.next_char();
-                    } else {
-                        break;
-                    }
+    
+        if self.in_tag {
+            // We are inside a tag - read tag tokens
+            match self.peek_char() {
+                Some('>') => {
+                    self.next_char();
+                    self.in_tag = false;
+                    Token { kind: TokenKind::Gt, line, column }
                 }
-                Token { kind: TokenKind::Name(name), line, column }
+                Some('/') => {
+                    self.next_char();
+                    Token { kind: TokenKind::Slash, line, column }
+                }
+                Some(c) if is_name_start_char(c) => {
+                    let mut name = String::new();
+                    while let Some(next_c) = self.peek_char() {
+                        if is_name_char(next_c) {
+                            name.push(next_c);
+                            self.next_char();
+                        } else {
+                            break;
+                        }
+                    }
+                    Token { kind: TokenKind::Name(name), line, column }
+                }
+                Some(c) => {
+                    // Unexpected char inside tag - consume it anyway
+                    self.next_char();
+                    Token { kind: TokenKind::Unknown(c), line, column }
+                }
+                None => Token { kind: TokenKind::EOF, line, column },
             }
-            Some(c) => {
-                // read as text until '<'
-                let mut text = String::new();
-                text.push(c);
-                while let Some(&next_c) = self.peek_char().as_ref() {
-                    if next_c == '<' {
-                        break;
-                    } else {
+        } else {
+            // Outside tag - should start with '<' or text
+            match self.peek_char() {
+                Some('<') => {
+                    self.next_char();
+                    self.in_tag = true;
+                    Token { kind: TokenKind::Lt, line, column }
+                }
+                Some(_) => {
+                    // Read all text until next '<'
+                    let mut text = String::new();
+                    while let Some(next_c) = self.peek_char() {
+                        if next_c == '<' {
+                            break;
+                        }
                         text.push(next_c);
                         self.next_char();
                     }
+                    Token { kind: TokenKind::InnerText(text), line, column }
                 }
-                Token { kind: TokenKind::Text(text), line, column }
+                None => Token { kind: TokenKind::EOF, line, column },
             }
-            None => Token { kind: TokenKind::EOF, line, column },
         }
-    }
+    }    
 
     fn skip_whitespace(&mut self) {
         while let Some(&c) = self.peek_char().as_ref() {
