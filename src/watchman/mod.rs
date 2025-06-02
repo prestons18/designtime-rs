@@ -1,3 +1,3 @@
 pub mod watchman;
 
-pub use watchman::watchman;
+pub use watchman::Watchman;

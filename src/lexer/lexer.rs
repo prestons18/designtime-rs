@@ -1,5 +1,6 @@
 // Simple lexer
 
+use crate::Span;
 use crate::lexer::line_tracker::LineTracker;
 use crate::lexer::tokens::{Token, TokenKind};
 
@@ -43,23 +44,35 @@ impl<'a> Lexer<'a> {
 
     pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
-    
+
         let (line, column) = self.line_tracker.position();
-    
+
         if self.in_tag {
             // We are inside a tag - read tag tokens
             match self.peek_char() {
                 Some('>') => {
                     self.next_char();
                     self.in_tag = false;
-                    Token { kind: TokenKind::Gt, line, column }
+                    Token {
+                        kind: TokenKind::Gt,
+                        span: Span {
+                            start_line: line,
+                            start_column: column,
+                            end_line: line,
+                            end_column: column,
+                        },
+                    }
                 }
                 Some('=') => {
                     self.next_char();
                     Token {
                         kind: TokenKind::Eq,
-                        line,
-                        column,
+                        span: Span {
+                            start_line: line,
+                            start_column: column,
+                            end_line: line,
+                            end_column: column,
+                        },
                     }
                 }
                 Some('"') => {
@@ -73,8 +86,16 @@ impl<'a> Lexer<'a> {
                         value.push(ch);
                         self.next_char();
                     }
-                    Token { kind: TokenKind::StringLiteral(value), line, column }
-                }                
+                    Token {
+                        kind: TokenKind::StringLiteral(value),
+                        span: Span {
+                            start_line: line,
+                            start_column: column,
+                            end_line: line,
+                            end_column: column,
+                        },
+                    }
+                }
                 Some('\'') => {
                     self.next_char(); // consume opening quote
                     let mut value = String::new();
@@ -86,11 +107,27 @@ impl<'a> Lexer<'a> {
                         value.push(ch);
                         self.next_char();
                     }
-                    Token { kind: TokenKind::StringLiteral(value), line, column }
-                }                
+                    Token {
+                        kind: TokenKind::StringLiteral(value),
+                        span: Span {
+                            start_line: line,
+                            start_column: column,
+                            end_line: line,
+                            end_column: column,
+                        },
+                    }
+                }
                 Some('/') => {
                     self.next_char();
-                    Token { kind: TokenKind::Slash, line, column }
+                    Token {
+                        kind: TokenKind::Slash,
+                        span: Span {
+                            start_line: line,
+                            start_column: column,
+                            end_line: line,
+                            end_column: column,
+                        },
+                    }
                 }
                 Some(c) if is_name_start_char(c) => {
                     let mut name = String::new();
@@ -102,14 +139,38 @@ impl<'a> Lexer<'a> {
                             break;
                         }
                     }
-                    Token { kind: TokenKind::Name(name), line, column }
+                    Token {
+                        kind: TokenKind::Name(name),
+                        span: Span {
+                            start_line: line,
+                            start_column: column,
+                            end_line: line,
+                            end_column: column,
+                        },
+                    }
                 }
                 Some(c) => {
                     // Unexpected char inside tag - consume it anyway
                     self.next_char();
-                    Token { kind: TokenKind::Unknown(c), line, column }
+                    Token {
+                        kind: TokenKind::Unknown(c),
+                        span: Span {
+                            start_line: line,
+                            start_column: column,
+                            end_line: line,
+                            end_column: column,
+                        },
+                    }
                 }
-                None => Token { kind: TokenKind::EOF, line, column },
+                None => Token {
+                    kind: TokenKind::EOF,
+                    span: Span {
+                        start_line: line,
+                        start_column: column,
+                        end_line: line,
+                        end_column: column,
+                    },
+                },
             }
         } else {
             // Outside tag - should start with '<' or text
@@ -117,7 +178,15 @@ impl<'a> Lexer<'a> {
                 Some('<') => {
                     self.next_char();
                     self.in_tag = true;
-                    Token { kind: TokenKind::Lt, line, column }
+                    Token {
+                        kind: TokenKind::Lt,
+                        span: Span {
+                            start_line: line,
+                            start_column: column,
+                            end_line: line,
+                            end_column: column,
+                        },
+                    }
                 }
                 Some(_) => {
                     // Read all text until next '<'
@@ -129,12 +198,28 @@ impl<'a> Lexer<'a> {
                         text.push(next_c);
                         self.next_char();
                     }
-                    Token { kind: TokenKind::InnerText(text), line, column }
+                    Token {
+                        kind: TokenKind::InnerText(text),
+                        span: Span {
+                            start_line: line,
+                            start_column: column,
+                            end_line: line,
+                            end_column: column,
+                        },
+                    }
                 }
-                None => Token { kind: TokenKind::EOF, line, column },
+                None => Token {
+                    kind: TokenKind::EOF,
+                    span: Span {
+                        start_line: line,
+                        start_column: column,
+                        end_line: line,
+                        end_column: column,
+                    },
+                },
             }
         }
-    }    
+    }
 
     fn skip_whitespace(&mut self) {
         while let Some(&c) = self.peek_char().as_ref() {
