@@ -505,10 +505,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "335ff9f135e4384c8150d6f27c6daed433577f86b4750418338c01a1a2528592"
 dependencies = [
  "cfg-if",
- "js-sys",
  "libc",
  "wasi 0.11.0+wasi-snapshot-preview1",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -1381,10 +1379,33 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 name = "render"
 version = "0.1.0"
 dependencies = [
+ "designtime_ast",
+ "render_core",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "render_core"
+version = "0.1.0"
+dependencies = [
+ "designtime_ast",
+ "dominate",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "render_wasm"
+version = "0.1.0"
+dependencies = [
  "console_error_panic_hook",
  "designtime_ast",
  "dominate",
- "getrandom 0.2.16",
+ "render_core",
+ "serde",
  "serde_json",
  "wasm-bindgen",
  "web-sys",
@@ -2049,6 +2070,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1a05d73b933a847d6cccdda8f838a22ff101ad9bf93e33684f39c1f5f0eece3d"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "watchman"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "notify",
+ "render_core",
+ "serde_json",
+ "tokio",
+ "warp",
+ "wasm-bindgen",
 ]
 
 [[package]]

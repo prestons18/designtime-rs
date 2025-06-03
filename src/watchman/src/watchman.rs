@@ -3,21 +3,20 @@ use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::sync::{broadcast, mpsc};
 use warp::Filter;
 use serde_json::json;
-use crate::render::RenderLib;
+use wasm_bindgen::JsValue;
+use render_core::render_nodes;
 
 pub struct Watchman {
-    render_lib: RenderLib,
     reload_tx: broadcast::Sender<()>,
     error_tx: mpsc::UnboundedSender<String>,
     error_rx: mpsc::UnboundedReceiver<String>,
 }
 
 impl Watchman {
-    pub fn new(render_lib: RenderLib) -> Self {
+    pub fn new() -> Self {
         let (reload_tx, _) = broadcast::channel(16);
         let (error_tx, error_rx) = mpsc::unbounded_channel();
         Self {
-            render_lib,
             reload_tx,
             error_tx,
             error_rx,
@@ -71,20 +70,29 @@ impl Watchman {
                 println!("Watcher thread exiting.");
             })?;
 
-        let mut render_lib = self.render_lib;
         let error_tx_clone = self.error_tx.clone();
         tokio::spawn(async move {
             while let Some(path) = file_change_rx.recv().await {
                 println!("Changed file: {}", path.display());
                 match std::fs::read_to_string(&path) {
                     Ok(source) => {
-                        if let Err(e) = render_lib.process_source(&source) {
-                            eprintln!("Error processing {}: {}", path.display(), e);
+                        match wasm_bindgen::JsValue::from_str(&source) {
+                            Ok(json) => {
+                                match render_nodes(&json) {
+                                    Ok(_) => {
+                                        let _ = error_tx_clone.send("reload");
+                                    }
+                                    Err(e) => {
+                                        let _ = error_tx_clone.send(format!("Failed to render {}: {}", path.display(), e));
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                let _ = error_tx_clone.send(format!("Failed to read {}: {}", path.display(), e));
+                            }
                         }
                     }
-                    Err(e) => {
-                        let _ = error_tx_clone.send(format!("Failed to read {}: {}", path.display(), e));
-                    }
+                    Err(_) => todo!(),
                 }
             }
             println!("File processor task ended.");

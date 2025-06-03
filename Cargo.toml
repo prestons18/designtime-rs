@@ -12,7 +12,7 @@ members = [
     "src/render",
     "src/ast",
     "src/dominate",
-    "src/styleman",
+    "src/styleman", "src/render-core", "src/render-wasm", "src/watchman",
 ]
 
 [workspace.dependencies]
