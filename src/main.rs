@@ -1,5 +1,5 @@
 use designtime_rs::engine::runtime::Runtime;
-use designtime_rs::{validate_and_load_workspace, Lexer, Parser};
+use designtime_rs::{validate_and_load_workspace, Lexer, Parser, RenderLib, Watchman};
 use std::path::PathBuf;
 
 #[tokio::main]
@@ -18,8 +18,8 @@ async fn main() -> anyhow::Result<()> {
 
     runtime.run(vec![parsed_nodes]);
 
-    // let render_lib = RenderLib::new(runtime);
-    // let watchman = Watchman::new(render_lib);
-    // watchman.run().await?;
+    let render_lib = RenderLib::new(runtime);
+    let watchman = Watchman::new(render_lib);
+    watchman.run().await?;
     Ok(())
 }

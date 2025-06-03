@@ -1,5 +1,6 @@
-use crate::{ast::Node, workspace::WorkspaceConfig};
-use crate::dominate::prelude::*;
+use designtime_ast::Node;
+use crate::workspace::WorkspaceConfig;
+use dominate::prelude::*;
 use std::fmt;
 
 #[derive(Debug)]

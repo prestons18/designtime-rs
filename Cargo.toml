@@ -5,9 +5,27 @@ edition = "2024"
 
 [lib]
 name = "designtime_rs"
-file = "src/lib.rs"
+path = "src/lib.rs"
+
+[workspace]
+members = [
+    "src/render",
+    "src/ast",
+    "src/dominate",
+    "src/styleman",
+]
+
+[workspace.dependencies]
+designtime_ast = { path = "src/ast" }
+dominate = { path = "src/dominate" }
+styleman = { path = "src/styleman" }
+render = { path = "src/render" }
 
 [dependencies]
+designtime_ast = { workspace = true }
+dominate = { workspace = true }
+styleman = { workspace = true }
+
 anyhow = "1.0.98"
 async-stream = "0.3.6"
 color-eyre = "0.6.5"
@@ -21,3 +39,6 @@ serde_json = "1.0.140"
 thiserror = "2.0.12"
 tokio = { version = "1.45.1", features= ["full"] }
 warp = "0.3.7"
+wasm-bindgen = "0.2.100"
+web-sys = { version = "0.3.77", features = ["Window", "Document", "Element", "HtmlElement", "Text", "Node", "console"] }
+console_error_panic_hook = "0.1.7"

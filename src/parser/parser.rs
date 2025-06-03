@@ -1,10 +1,9 @@
 use crate::{
     lexer::{Token, TokenKind}, 
     Lexer, 
-    ast::Node,
     error::DesignTimeError
 };
-
+use designtime_ast::Node;
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
     current: Token,

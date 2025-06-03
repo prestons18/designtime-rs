@@ -3,7 +3,6 @@ use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::sync::{broadcast, mpsc};
 use warp::Filter;
 use serde_json::json;
-
 use crate::render::RenderLib;
 
 pub struct Watchman {

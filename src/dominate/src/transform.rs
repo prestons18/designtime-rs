@@ -1,6 +1,6 @@
-use crate::ast::Node;
 use crate::dom::DomNode;
-use crate::styleman::StyleMan;
+use designtime_ast::Node;
+use styleman::StyleMan;
 use lazy_static::lazy_static;
 use std::sync::Mutex;
 

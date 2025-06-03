@@ -151,9 +151,9 @@ checksum = "1628fb46dfa0b37568d12e5edd512553eccf6a22a78e8bde00bb4aed84d5bdbf"
 
 [[package]]
 name = "bytecount"
-version = "0.6.8"
+version = "0.6.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ce89b21cab1437276d2650d57e971f9d548a2d9037cc231abdc0562b97498ce"
+checksum = "175812e0be2bccb6abe50bb8d566126198344f707e304f45c648fd8f2cc0365e"
 
 [[package]]
 name = "byteorder"
@@ -236,13 +236,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a2330da5de22e8a3cb63252ce2abb30116bf5265e89c0e01bc17015ce30a476"
 
 [[package]]
-name = "designtime_ast"
-version = "0.1.0"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "designtime_rs"
 version = "0.1.0"
 dependencies = [
@@ -250,8 +243,6 @@ dependencies = [
  "async-stream",
  "color-eyre",
  "console_error_panic_hook",
- "designtime_ast",
- "dominate",
  "futures",
  "jsonschema",
  "lazy_static",
@@ -259,7 +250,6 @@ dependencies = [
  "owo-colors",
  "serde",
  "serde_json",
- "styleman",
  "thiserror 2.0.12",
  "tokio",
  "warp",
@@ -286,15 +276,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "dominate"
-version = "0.1.0"
-dependencies = [
- "designtime_ast",
- "lazy_static",
- "styleman",
 ]
 
 [[package]]
@@ -505,10 +486,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "335ff9f135e4384c8150d6f27c6daed433577f86b4750418338c01a1a2528592"
 dependencies = [
  "cfg-if",
- "js-sys",
  "libc",
  "wasi 0.11.0+wasi-snapshot-preview1",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -1382,19 +1361,14 @@ name = "render"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
- "designtime_ast",
- "dominate",
- "getrandom 0.2.16",
- "serde_json",
- "wasm-bindgen",
- "web-sys",
+ "designtime_rs",
 ]
 
 [[package]]
 name = "reqwest"
-version = "0.12.18"
+version = "0.12.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e98ff6b0dbbe4d5a37318f433d4fc82babd21631f194d370409ceb2e40b2f0b5"
+checksum = "a2f8e5513d63f2e5b386eb5106dc67eaf3f84e95258e210489136b8b92ad6119"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -1577,10 +1551,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
-name = "styleman"
-version = "0.1.0"
-
-[[package]]
 name = "syn"
 version = "2.0.101"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1742,9 +1712,9 @@ dependencies = [
 
 [[package]]
 name = "tower-http"
-version = "0.6.4"
+version = "0.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fdb0c213ca27a9f57ab69ddb290fd80d970922355b83ae380b395d3986b8a2e"
+checksum = "adc82fd73de2a9722ac5da747f12383d2bfdb93591ee6c58486e0097890f05f2"
 dependencies = [
  "bitflags 2.9.1",
  "bytes",
