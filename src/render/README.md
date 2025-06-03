@@ -6,8 +6,3 @@ To build the WASM module, run:
 ```
 wasm-pack build --target web
 ```
-
-To run the WASM module, run:
-```
-./target/wasm32-unknown-unknown/debug/design_time.wasm
-```
