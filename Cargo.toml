@@ -9,7 +9,6 @@ path = "src/lib.rs"
 
 [workspace]
 members = [
-    "src/render",
     "src/ast",
     "src/dominate",
     "src/styleman", "src/render-core", "src/render-wasm", "src/watchman",
@@ -19,7 +18,9 @@ members = [
 designtime_ast = { path = "src/ast" }
 dominate = { path = "src/dominate" }
 styleman = { path = "src/styleman" }
-render = { path = "src/render" }
+render_core = { path = "src/render-core" }
+render_wasm = { path = "src/render-wasm" }
+watchman = { path = "src/watchman" }
 
 [dependencies]
 designtime_ast = { workspace = true }
