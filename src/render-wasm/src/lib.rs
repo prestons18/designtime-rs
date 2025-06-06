@@ -3,8 +3,6 @@
 mod dom;
 
 use wasm_bindgen::prelude::*;
-use web_sys::{Document, Node as WebSysNode};
-use dominate::dom::DomNode;
 use designtime_ast::Node;
 use render_core::transform;
 
@@ -23,6 +21,8 @@ pub fn main() {
 ///
 /// # Returns
 /// Returns `Ok(())` on success, or a `JsValue` containing an error message on failure.
+/// 
+/// For now, this function processes nodes one by one. For better performance, I should use a batch renderer.
 #[wasm_bindgen(js_name = renderFromJson)]
 pub fn render_from_json(json: &str) -> Result<(), JsValue> {
     // Parse the JSON string into AST nodes

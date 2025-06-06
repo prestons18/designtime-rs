@@ -13,31 +13,29 @@ pub enum RenderError {
 
 /// Core rendering function that transforms a list of AST nodes into DOM nodes
 pub fn render_nodes(nodes: Vec<Node>) -> Vec<DomNode> {
-    nodes.into_iter().map(transform_node).collect()
+    nodes.into_iter().map(transform_node).collect::<Result<Vec<DomNode>, RenderError>>().unwrap()
 }
 
 /// Transform a single AST node into a DOM node
-fn transform_node(node: Node) -> DomNode {
+pub fn transform_node(node: Node) -> Result<DomNode, RenderError> {
     match node {
         Node::Element { tag_name, attributes, children, .. } => {
             let mut builder = DomNode::element(&tag_name)
                 .attributes(attributes);
             
             for child in children {
-                builder = builder.child(transform_node(child));
+                builder = builder.child(transform_node(child)?);
             }
-            
-            builder.build()
+            Ok(builder.build())
         }
-        Node::Text(content) => DomNode::text(&content),
-        // Handle other node variants as needed
-        _ => DomNode::text("Unsupported node type"),
+        Node::Text(content) => Ok(DomNode::text(&content)),
+        _ => Err(RenderError::DomError),
     }
 }
 
 /// Transform a list of AST nodes into a list of DOM nodes
 pub fn transform(nodes: Vec<Node>) -> Vec<DomNode> {
-    nodes.into_iter().map(transform_node).collect()
+    nodes.into_iter().map(transform_node).collect::<Result<Vec<DomNode>, RenderError>>().unwrap()
 }
 
 #[cfg(test)]
@@ -48,7 +46,7 @@ mod tests {
     #[test]
     fn test_transform_text_node() {
         let node = Node::Text("Hello".to_string());
-        let dom_node = transform_node(node);
+        let dom_node = transform_node(node).unwrap();
         
         if let DomNode::Text(text) = dom_node {
             assert_eq!(text, "Hello");
@@ -66,7 +64,7 @@ mod tests {
             class_names: vec!["container".to_string()],
         };
         
-        let dom_node = transform_node(node);
+        let dom_node = transform_node(node).unwrap();
         
         if let DomNode::Element { tag, attributes, children, .. } = dom_node {
             

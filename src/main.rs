@@ -1,5 +1,5 @@
 use designtime_rs::engine::runtime::Runtime;
-use designtime_rs::{validate_and_load_workspace, Lexer, Parser, RenderLib, Watchman};
+use designtime_rs::{validate_and_load_workspace, Lexer, Parser};
 use std::path::PathBuf;
 
 #[tokio::main]
@@ -12,14 +12,13 @@ async fn main() -> anyhow::Result<()> {
     let mut parse = Parser::new(lex);
     let parsed_nodes = parse.parse()?;
 
+    println!("Parsed nodes: {:?}", parsed_nodes);
+
     let workspace = PathBuf::from("./designtime.json");
     let config = validate_and_load_workspace(workspace).expect("Failed to load workspace config");
     let mut runtime = Runtime::new(config);
 
-    runtime.run(vec![parsed_nodes]);
-
-    let render_lib = RenderLib::new(runtime);
-    let watchman = Watchman::new(render_lib);
-    watchman.run().await?;
+    runtime.run(vec![parsed_nodes]).await;
+    
     Ok(())
 }

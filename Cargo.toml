@@ -11,7 +11,10 @@ path = "src/lib.rs"
 members = [
     "src/ast",
     "src/dominate",
-    "src/styleman", "src/render-core", "src/render-wasm", "src/watchman",
+    "src/styleman",
+    "src/render-core",
+    "src/render-wasm",
+    "src/watchman",
 ]
 
 [workspace.dependencies]
@@ -26,6 +29,8 @@ watchman = { path = "src/watchman" }
 designtime_ast = { workspace = true }
 dominate = { workspace = true }
 styleman = { workspace = true }
+render_core = { workspace = true }
+watchman = { workspace = true }
 
 anyhow = "1.0.98"
 async-stream = "0.3.6"

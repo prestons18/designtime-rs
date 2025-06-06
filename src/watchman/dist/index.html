@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DesignTime - Visual Development Environment</title>
+    <meta name="description" content="A modern visual development environment powered by WASM">
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" as="style">
+    <link rel="preload" href="./render_wasm.js" as="script">
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        /* CSS Reset and Base Styles */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        :root {
+            /* Color System */
+            --color-bg-primary: #0a0a0a;
+            --color-bg-secondary: #1a1a1a;
+            --color-bg-tertiary: #2a2a2a;
+            --color-bg-overlay: rgba(0, 0, 0, 0.9);
+            --color-text-primary: #ffffff;
+            --color-text-secondary: #a0a0a0;
+            --color-accent: #3b82f6;
+            --color-accent-hover: #2563eb;
+            --color-success: #10b981;
+            --color-warning: #f59e0b;
+            --color-error: #ef4444;
+            
+            /* Spacing */
+            --space-xs: 0.25rem;
+            --space-sm: 0.5rem;
+            --space-md: 1rem;
+            --space-lg: 1.5rem;
+            --space-xl: 2rem;
+            --space-2xl: 3rem;
+            
+            /* Typography */
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+            
+            /* Shadows */
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            
+            /* Transitions */
+            --transition-fast: 150ms ease;
+            --transition-normal: 250ms ease;
+            --transition-slow: 350ms ease;
+        }
+        
+        html {
+            font-family: var(--font-sans);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
+        }
+        
+        body {
+            min-height: 100vh;
+            background: var(--color-bg-primary);
+            color: var(--color-text-primary);
+            overflow-x: hidden;
+            position: relative;
+        }
+        
+        /* Main Application Container */
+        #root {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+        }
+        
+        #root > * {
+            pointer-events: auto;
+        }
+        
+        /* Loading State */
+        .loading-screen {
+            position: fixed;
+            inset: 0;
+            background: var(--color-bg-primary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity var(--transition-slow), visibility var(--transition-slow);
+        }
+        
+        .loading-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--color-bg-tertiary);
+            border-top-color: var(--color-accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: var(--space-lg);
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            font-size: 0.875rem;
+            color: var(--color-text-secondary);
+            text-align: center;
+        }
+        
+        /* Floating Action Button */
+        .fab-container {
+            position: fixed;
+            bottom: var(--space-xl);
+            right: var(--space-xl);
+            z-index: 1000;
+        }
+        
+        .fab {
+            width: 64px;
+            height: 64px;
+            background: var(--color-accent);
+            border: none;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all var(--transition-normal);
+            box-shadow: var(--shadow-lg);
+            position: relative;
+        }
+        
+        .fab:hover {
+            transform: scale(1.05);
+            background: var(--color-accent-hover);
+            box-shadow: var(--shadow-xl);
+        }
+        
+        .fab:active {
+            transform: scale(0.95);
+        }
+        
+        .fab-icon {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--color-text-primary);
+            user-select: none;
+        }
+        
+        /* Action Menu */
+        .action-menu {
+            position: absolute;
+            bottom: 80px;
+            right: 0;
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-sm);
+            opacity: 0;
+            transform: translateY(var(--space-sm)) scale(0.9);
+            transition: all var(--transition-normal);
+            pointer-events: none;
+        }
+        
+        .fab-container:hover .action-menu {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
+        
+        .action-button {
+            width: 48px;
+            height: 48px;
+            background: var(--color-bg-secondary);
+            border: none;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            box-shadow: var(--shadow-md);
+            position: relative;
+            text-decoration: none;
+            color: var(--color-text-primary);
+        }
+        
+        .action-button:hover {
+            background: var(--color-bg-tertiary);
+            transform: scale(1.1);
+        }
+        
+        .action-button::before {
+            content: attr(data-tooltip);
+            position: absolute;
+            right: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--color-bg-overlay);
+            color: var(--color-text-primary);
+            padding: var(--space-xs) var(--space-sm);
+            border-radius: 6px;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity var(--transition-fast);
+            margin-right: var(--space-sm);
+        }
+        
+        .action-button:hover::before {
+            opacity: 1;
+        }
+        
+        /* Debug Panel */
+        .debug-panel {
+            position: fixed;
+            top: var(--space-md);
+            right: var(--space-md);
+            width: min(400px, calc(100vw - 2rem));
+            max-height: calc(100vh - 2rem);
+            background: var(--color-bg-overlay);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--color-bg-tertiary);
+            border-radius: 12px;
+            overflow: hidden;
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateX(var(--space-md));
+            transition: all var(--transition-normal);
+        }
+        
+        .debug-panel.visible {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(0);
+        }
+        
+        .debug-header {
+            padding: var(--space-md);
+            border-bottom: 1px solid var(--color-bg-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .debug-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--color-text-primary);
+        }
+        
+        .debug-close {
+            background: none;
+            border: none;
+            color: var(--color-text-secondary);
+            cursor: pointer;
+            padding: var(--space-xs);
+            border-radius: 4px;
+            transition: background-color var(--transition-fast);
+        }
+        
+        .debug-close:hover {
+            background: var(--color-bg-tertiary);
+        }
+        
+        .debug-content {
+            padding: var(--space-md);
+            overflow: auto;
+            max-height: calc(80vh - 60px);
+        }
+        
+        .debug-content pre {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            line-height: 1.4;
+            color: var(--color-text-secondary);
+            background: var(--color-bg-secondary);
+            padding: var(--space-md);
+            border-radius: 8px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        
+        /* Status Messages */
+        .status-container {
+            position: fixed;
+            top: var(--space-md);
+            left: var(--space-md);
+            z-index: 1500;
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-sm);
+        }
+        
+        .status-message {
+            padding: var(--space-sm) var(--space-md);
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transform: translateX(-100%);
+            transition: transform var(--transition-normal);
+            max-width: 300px;
+        }
+        
+        .status-message.visible {
+            transform: translateX(0);
+        }
+        
+        .status-message.success {
+            background: var(--color-success);
+            color: white;
+        }
+        
+        .status-message.error {
+            background: var(--color-error);
+            color: white;
+        }
+        
+        .status-message.info {
+            background: var(--color-accent);
+            color: white;
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .fab-container {
+                bottom: var(--space-lg);
+                right: var(--space-lg);
+            }
+            
+            .debug-panel {
+                top: var(--space-sm);
+                right: var(--space-sm);
+                left: var(--space-sm);
+                width: auto;
+            }
+            
+            .status-container {
+                top: var(--space-sm);
+                left: var(--space-sm);
+                right: var(--space-sm);
+            }
+            
+            .status-message {
+                max-width: none;
+            }
+        }
+        
+        /* Accessibility */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+        
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="loading-spinner" aria-hidden="true"></div>
+        <div class="loading-text">
+            <div>Initializing DesignTime...</div>
+            <div id="loading-status">Loading WASM module</div>
+        </div>
+    </div>
+    
+    <!-- Main Application Root -->
+    <div id="root" role="main" aria-label="DesignTime Application"></div>
+    
+    <!-- Status Messages -->
+    <div id="status-container" class="status-container" aria-live="polite"></div>
+    
+    <!-- Floating Action Button -->
+    <div class="fab-container">
+        <button class="fab" aria-label="DesignTime Actions" aria-expanded="false">
+            <span class="fab-icon">D</span>
+        </button>
+        <nav class="action-menu" role="menu">
+            <button class="action-button" data-tooltip="Design Mode" role="menuitem" id="btn-design">
+                🎨
+                <span class="sr-only">Design Mode</span>
+            </button>
+            <button class="action-button" data-tooltip="Edit Code" role="menuitem" id="btn-edit">
+                📝
+                <span class="sr-only">Edit Code</span>
+            </button>
+            <button class="action-button" data-tooltip="Run Preview" role="menuitem" id="btn-run">
+                ⚡
+                <span class="sr-only">Run Preview</span>
+            </button>
+            <button class="action-button" data-tooltip="Debug Info" role="menuitem" id="btn-debug">
+                🐛
+                <span class="sr-only">Debug Info</span>
+            </button>
+        </nav>
+    </div>
+    
+    <!-- Debug Panel -->
+    <aside id="debug-panel" class="debug-panel" role="complementary" aria-labelledby="debug-title">
+        <header class="debug-header">
+            <h2 id="debug-title" class="debug-title">Debug Information</h2>
+            <button class="debug-close" aria-label="Close debug panel">✕</button>
+        </header>
+        <div class="debug-content">
+            <h3 style="margin-bottom: var(--space-sm); font-size: 0.8rem; color: var(--color-text-secondary);">AST Structure:</h3>
+            <pre id="debug-ast">[
+  {
+    "Element": {
+      "tag_name": "div",
+      "attributes": [
+        [
+          "class",
+          "container"
+        ]
+      ],
+      "class_names": [
+        "container"
+      ],
+      "children": [
+        {
+          "Element": {
+            "tag_name": "h1",
+            "attributes": [
+              [
+                "class",
+                "title"
+              ]
+            ],
+            "class_names": [
+              "title"
+            ],
+            "children": [
+              {
+                "Text": "🔍 Watchman Demo"
+              }
+            ]
+          }
+        },
+        {
+          "Element": {
+            "tag_name": "div",
+            "attributes": [
+              [
+                "class",
+                "greeting"
+              ],
+              [
+                "id",
+                "hello"
+              ]
+            ],
+            "class_names": [
+              "greeting"
+            ],
+            "children": [
+              {
+                "Text": "Hello worl!"
+              }
+            ]
+          }
+        },
+        {
+          "Element": {
+            "tag_name": "p",
+            "attributes": [
+              [
+                "class",
+                "description"
+              ]
+            ],
+            "class_names": [
+              "description"
+            ],
+            "children": [
+              {
+                "Text": "This page was generated using render-core and served with Watchman."
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+]</pre>
+        </div>
+    </aside>
+
+    <script type="module">
+        // Application State
+        const AppState = {
+            astData: null,
+            wasmModule: null,
+            isLoading: true,
+            debugVisible: false
+        };
+        
+        // Utility Functions
+        const $ = (selector) => document.querySelector(selector);
+        const $$ = (selector) => document.querySelectorAll(selector);
+        
+        const showStatus = (message, type = 'info', duration = 3000) => {
+            const container = $('#status-container');
+            const statusEl = document.createElement('div');
+            statusEl.className = `status-message ${type}`;
+            statusEl.textContent = message;
+            
+            container.appendChild(statusEl);
+            
+            // Trigger animation
+            requestAnimationFrame(() => {
+                statusEl.classList.add('visible');
+            });
+            
+            // Auto remove
+            setTimeout(() => {
+                statusEl.classList.remove('visible');
+                setTimeout(() => statusEl.remove(), 300);
+            }, duration);
+        };
+        
+        const updateLoadingStatus = (status) => {
+            const statusEl = $('#loading-status');
+            if (statusEl) statusEl.textContent = status;
+        };
+        
+        const hideLoading = () => {
+            const loadingScreen = $('#loading-screen');
+            loadingScreen.classList.add('hidden');
+            setTimeout(() => {
+                loadingScreen.style.display = 'none';
+            }, 350);
+        };
+        
+        // WASM Initialization
+        async function initializeWasm() {
+            try {
+                updateLoadingStatus('Loading WASM module...');
+                console.log('🔄 Initializing WASM...');
+                
+                // Store AST data
+                AppState.astData = `[
+  {
+    "Element": {
+      "tag_name": "div",
+      "attributes": [
+        [
+          "class",
+          "container"
+        ]
+      ],
+      "class_names": [
+        "container"
+      ],
+      "children": [
+        {
+          "Element": {
+            "tag_name": "h1",
+            "attributes": [
+              [
+                "class",
+                "title"
+              ]
+            ],
+            "class_names": [
+              "title"
+            ],
+            "children": [
+              {
+                "Text": "🔍 Watchman Demo"
+              }
+            ]
+          }
+        },
+        {
+          "Element": {
+            "tag_name": "div",
+            "attributes": [
+              [
+                "class",
+                "greeting"
+              ],
+              [
+                "id",
+                "hello"
+              ]
+            ],
+            "class_names": [
+              "greeting"
+            ],
+            "children": [
+              {
+                "Text": "Hello worl!"
+              }
+            ]
+          }
+        },
+        {
+          "Element": {
+            "tag_name": "p",
+            "attributes": [
+              [
+                "class",
+                "description"
+              ]
+            ],
+            "class_names": [
+              "description"
+            ],
+            "children": [
+              {
+                "Text": "This page was generated using render-core and served with Watchman."
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+]`;
+                window.astData = JSON.parse(AppState.astData);
+                
+                // Load WASM module
+                const wasmModule = await import('./render_wasm.js');
+                updateLoadingStatus('Initializing WASM runtime...');
+                await wasmModule.default();
+                
+                AppState.wasmModule = wasmModule;
+                console.log('✅ WASM loaded successfully');
+                
+                // Render AST
+                updateLoadingStatus('Rendering application...');
+                console.log('🎨 Rendering AST...');
+                
+                wasmModule.renderFromJson(AppState.astData);
+                console.log('✅ Rendering completed');
+                
+                AppState.isLoading = false;
+                hideLoading();
+                showStatus('DesignTime initialized successfully!', 'success');
+                
+            } catch (error) {
+                console.error('❌ WASM initialization failed:', error);
+                AppState.isLoading = false;
+                hideLoading();
+                showStatus(`Initialization failed: ${error.message}`, 'error', 5000);
+                
+                // Show debug panel on error
+                toggleDebugPanel(true);
+            }
+        }
+        
+        // Debug Panel Management
+        const toggleDebugPanel = (force) => {
+            const panel = $('#debug-panel');
+            const isVisible = typeof force === 'boolean' ? force : !AppState.debugVisible;
+            
+            AppState.debugVisible = isVisible;
+            panel.classList.toggle('visible', isVisible);
+            
+            // Update FAB aria-expanded
+            const fab = $('.fab');
+            fab.setAttribute('aria-expanded', isVisible.toString());
+        };
+        
+        // Event Handlers
+        const setupEventListeners = () => {
+            // FAB hover state
+            const fabContainer = $('.fab-container');
+            const fab = $('.fab');
+            
+            fabContainer.addEventListener('mouseenter', () => {
+                fab.setAttribute('aria-expanded', 'true');
+            });
+            
+            fabContainer.addEventListener('mouseleave', () => {
+                if (!AppState.debugVisible) {
+                    fab.setAttribute('aria-expanded', 'false');
+                }
+            });
+            
+            // Action buttons
+            $('#btn-design')?.addEventListener('click', () => {
+                showStatus('Design mode activated', 'info');
+                // Add design mode logic here
+            });
+            
+            $('#btn-edit')?.addEventListener('click', () => {
+                showStatus('Edit mode activated', 'info');
+                // Add edit mode logic here
+            });
+            
+            $('#btn-run')?.addEventListener('click', () => {
+                showStatus('Running preview...', 'info');
+                // Add run logic here
+                if (AppState.wasmModule && AppState.astData) {
+                    try {
+                        AppState.wasmModule.renderFromJson(AppState.astData);
+                        showStatus('Preview updated successfully!', 'success');
+                    } catch (error) {
+                        showStatus(`Preview failed: ${error.message}`, 'error');
+                    }
+                }
+            });
+            
+            $('#btn-debug')?.addEventListener('click', () => {
+                toggleDebugPanel();
+            });
+            
+            // Debug panel close
+            $('.debug-close')?.addEventListener('click', () => {
+                toggleDebugPanel(false);
+            });
+            
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (event) => {
+                // Debug toggle (Ctrl/Cmd + D)
+                if ((event.ctrlKey || event.metaKey) && event.key === 'd') {
+                    event.preventDefault();
+                    toggleDebugPanel();
+                }
+                
+                // Escape to close debug panel
+                if (event.key === 'Escape' && AppState.debugVisible) {
+                    toggleDebugPanel(false);
+                }
+            });
+        };
+        
+        // Application Initialization
+        const initializeApp = async () => {
+            console.log('🚀 Starting DesignTime...');
+            
+            // Setup event listeners
+            setupEventListeners();
+            
+            // Initialize WASM
+            await initializeWasm();
+            
+            console.log('✨ DesignTime ready!');
+        };
+        
+        // Start the application
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeApp);
+        } else {
+            initializeApp();
+        }
+        
+        // Error handling for unhandled promise rejections
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('Unhandled promise rejection:', event.reason);
+            showStatus('An unexpected error occurred', 'error');
+        });
+        
+        // Export for debugging
+        window.DesignTime = {
+            AppState,
+            showStatus,
+            toggleDebugPanel,
+            reinitialize: initializeWasm
+        };
+    </script>
+</body>
+</html>

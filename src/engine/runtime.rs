@@ -1,7 +1,8 @@
 use designtime_ast::Node;
 use crate::workspace::WorkspaceConfig;
-use dominate::prelude::*;
+// use dominate::prelude::*;
 use std::fmt;
+use watchman::{generate_html_file, start_server};
 
 #[derive(Debug)]
 pub struct RuntimeError {
@@ -56,22 +57,22 @@ impl Runtime {
         }
     }
 
-    /// Accepts parsed AST nodes, transforms them into DomNodes, and retrieves CSS.
-    pub fn process_nodes(&mut self, nodes: Vec<Node>) -> Result<(Vec<DomNode>, String), RuntimeError> {
-        // Call dominate's transform
-        let dom_nodes: Vec<DomNode> = transform(nodes);
-
-        // Get generated CSS from StyleMan
-        let css = get_css();
-
-        Ok((dom_nodes, css))
+    /// Accepts parsed AST nodes and generates an HTML file with a live preview
+    pub fn process_nodes(&mut self, nodes: Vec<Node>) -> Result<(), RuntimeError> {
+        // Generate HTML file with live preview
+        generate_html_file(&nodes).map_err(|e| RuntimeError {
+            message: "Failed to generate HTML file".to_string(),
+            source: Some(Box::new(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())) as Box<dyn std::error::Error + Send + Sync>),
+            span: None,
+        })
     }
 
-    pub fn run(&mut self, nodes: Vec<Node>) {
+    pub async fn run(&mut self, nodes: Vec<Node>) {
         match self.process_nodes(nodes) {
-            Ok((dom_nodes, css)) => {
-                println!("DomNodes:\n{:#?}", dom_nodes);
-                println!("CSS:\n{}", css);
+            Ok(()) => {
+                println!("✅ HTML file generated successfully");
+                println!("📡 Starting preview server...");
+                start_server().await;
             }
             Err(e) => {
                 eprintln!("Runtime error: {}", e);
